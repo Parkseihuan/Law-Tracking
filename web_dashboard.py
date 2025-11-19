@@ -87,6 +87,142 @@ def add_law():
         return jsonify({"성공": False, "오류": str(e)}), 500
 
 
+@app.route('/api/bulk-add-laws', methods=['POST'])
+def bulk_add_laws():
+    """여러 법령 일괄 추가"""
+    if not tracker:
+        return jsonify({"error": "API 키가 설정되지 않았습니다"}), 500
+
+    data = request.get_json()
+    laws_text = data.get('법령목록', '')
+
+    if not laws_text:
+        return jsonify({"성공": False, "오류": "법령 목록이 필요합니다"}), 400
+
+    # 텍스트 파싱 (줄바꿈, 쉼표, 세미콜론으로 구분)
+    law_names = []
+    for line in laws_text.split('\n'):
+        line = line.strip()
+        if not line or line.startswith('#'):
+            continue
+        # 쉼표나 세미콜론으로 구분된 경우
+        for name in line.replace(';', ',').split(','):
+            name = name.strip()
+            if name:
+                law_names.append(name)
+
+    if not law_names:
+        return jsonify({"성공": False, "오류": "추가할 법령이 없습니다"}), 400
+
+    results = {
+        "성공": [],
+        "실패": [],
+        "건너뛰기": []
+    }
+
+    for law_name in law_names:
+        try:
+            # 이미 추적 중인지 확인
+            if law_name in tracker.tracked_laws:
+                results["건너뛰기"].append(law_name)
+                continue
+
+            success = tracker.add_law(law_name)
+            if success:
+                results["성공"].append(law_name)
+            else:
+                results["실패"].append(law_name)
+        except Exception as e:
+            results["실패"].append(f"{law_name} (오류: {str(e)})")
+
+    return jsonify({
+        "성공": True,
+        "결과": results,
+        "총개수": len(law_names),
+        "성공개수": len(results["성공"]),
+        "실패개수": len(results["실패"]),
+        "건너뛰기개수": len(results["건너뛰기"])
+    })
+
+
+@app.route('/api/upload-file', methods=['POST'])
+def upload_file():
+    """파일 업로드하여 법령 추가"""
+    if not tracker:
+        return jsonify({"error": "API 키가 설정되지 않았습니다"}), 500
+
+    if 'file' not in request.files:
+        return jsonify({"성공": False, "오류": "파일이 없습니다"}), 400
+
+    file = request.files['file']
+
+    if file.filename == '':
+        return jsonify({"성공": False, "오류": "파일이 선택되지 않았습니다"}), 400
+
+    # 파일 확장자 확인
+    filename = file.filename.lower()
+    if not (filename.endswith('.txt') or filename.endswith('.csv')):
+        return jsonify({"성공": False, "오류": "txt 또는 csv 파일만 가능합니다"}), 400
+
+    try:
+        # 파일 내용 읽기
+        content = file.read().decode('utf-8')
+
+        # CSV 파일인 경우
+        if filename.endswith('.csv'):
+            law_names = []
+            for line in content.split('\n'):
+                # CSV의 첫 번째 컬럼만 사용
+                parts = line.split(',')
+                if parts:
+                    name = parts[0].strip()
+                    if name and not name.startswith('#'):
+                        law_names.append(name)
+        else:
+            # TXT 파일
+            law_names = []
+            for line in content.split('\n'):
+                line = line.strip()
+                if line and not line.startswith('#'):
+                    law_names.append(line)
+
+        if not law_names:
+            return jsonify({"성공": False, "오류": "파일에 법령이 없습니다"}), 400
+
+        results = {
+            "성공": [],
+            "실패": [],
+            "건너뛰기": []
+        }
+
+        for law_name in law_names:
+            try:
+                # 이미 추적 중인지 확인
+                if law_name in tracker.tracked_laws:
+                    results["건너뛰기"].append(law_name)
+                    continue
+
+                success = tracker.add_law(law_name)
+                if success:
+                    results["성공"].append(law_name)
+                else:
+                    results["실패"].append(law_name)
+            except Exception as e:
+                results["실패"].append(f"{law_name} (오류: {str(e)})")
+
+        return jsonify({
+            "성공": True,
+            "결과": results,
+            "총개수": len(law_names),
+            "성공개수": len(results["성공"]),
+            "실패개수": len(results["실패"]),
+            "건너뛰기개수": len(results["건너뛰기"])
+        })
+
+    except Exception as e:
+        return jsonify({"성공": False, "오류": str(e)}), 500
+
+
 @app.route('/api/remove-law', methods=['POST'])
 def remove_law():
     """법령 제거"""
@@ -306,6 +442,89 @@ def create_templates():
             font-size: 16px;
         }
 
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e0e0e0;
+            padding-bottom: 10px;
+        }
+
+        .tab-btn {
+            background: none;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-size: 16px;
+            color: #666;
+            transition: all 0.3s;
+            border-bottom: 3px solid transparent;
+        }
+
+        .tab-btn:hover {
+            color: #667eea;
+        }
+
+        .tab-btn.active {
+            color: #667eea;
+            border-bottom: 3px solid #667eea;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 150px;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            font-family: 'Malgun Gothic', '맑은 고딕', sans-serif;
+            resize: vertical;
+        }
+
+        input[type="file"] {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            width: 100%;
+            cursor: pointer;
+        }
+
+        .result-box {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 5px;
+        }
+
+        .result-success {
+            background-color: #d4edda;
+            border-left: 4px solid #28a745;
+            color: #155724;
+        }
+
+        .result-warning {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            color: #856404;
+        }
+
+        .result-error {
+            background-color: #f8d7da;
+            border-left: 4px solid #dc3545;
+            color: #721c24;
+        }
+
+        .result-item {
+            margin: 5px 0;
+        }
+
         .loading {
             display: none;
             text-align: center;
@@ -370,9 +589,43 @@ def create_templates():
         <!-- 법령 추가 -->
         <div class="section">
             <h2>➕ 법령 추가</h2>
-            <div class="input-group">
-                <input type="text" id="law-name-input" placeholder="법령명 입력 (예: 교육기본법)">
-                <button class="btn" onclick="addLaw()">추가</button>
+
+            <!-- 탭 메뉴 -->
+            <div class="tabs">
+                <button class="tab-btn active" onclick="switchTab('single')">단일 추가</button>
+                <button class="tab-btn" onclick="switchTab('multiple')">여러 개 추가</button>
+                <button class="tab-btn" onclick="switchTab('file')">파일 업로드</button>
+            </div>
+
+            <!-- 단일 추가 -->
+            <div id="tab-single" class="tab-content active">
+                <div class="input-group">
+                    <input type="text" id="law-name-input" placeholder="법령명 입력 (예: 교육기본법)">
+                    <button class="btn" onclick="addLaw()">추가</button>
+                </div>
+            </div>
+
+            <!-- 여러 개 추가 -->
+            <div id="tab-multiple" class="tab-content">
+                <p style="color: #666; margin-bottom: 10px;">
+                    여러 법령을 한 번에 입력하세요 (한 줄에 하나씩 또는 쉼표로 구분)
+                </p>
+                <textarea id="bulk-laws-input" placeholder="예시:
+사립학교법
+고등교육법, 교육기본법
+초중등교육법"></textarea>
+                <button class="btn" onclick="bulkAddLaws()" style="margin-top: 10px;">일괄 추가</button>
+                <div id="bulk-result"></div>
+            </div>
+
+            <!-- 파일 업로드 -->
+            <div id="tab-file" class="tab-content">
+                <p style="color: #666; margin-bottom: 10px;">
+                    txt 또는 csv 파일을 업로드하세요 (한 줄에 법령명 하나씩)
+                </p>
+                <input type="file" id="file-input" accept=".txt,.csv" style="margin-bottom: 10px;">
+                <button class="btn" onclick="uploadFile()">파일 업로드</button>
+                <div id="file-result"></div>
             </div>
         </div>
 
@@ -548,6 +801,169 @@ def create_templates():
                 }
             } catch (error) {
                 alert(`오류 발생: ${error.message}`);
+            }
+        }
+
+        // 탭 전환
+        function switchTab(tab) {
+            // 모든 탭 버튼과 콘텐츠 비활성화
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+            // 선택된 탭 활성화
+            event.target.classList.add('active');
+            document.getElementById('tab-' + tab).classList.add('active');
+        }
+
+        // 여러 법령 일괄 추가
+        async function bulkAddLaws() {
+            const textarea = document.getElementById('bulk-laws-input');
+            const lawsText = textarea.value.trim();
+            const resultDiv = document.getElementById('bulk-result');
+
+            if (!lawsText) {
+                alert('법령을 입력해주세요');
+                return;
+            }
+
+            resultDiv.innerHTML = '<div class="loading show"><div class="spinner"></div><p>법령 추가 중...</p></div>';
+
+            try {
+                const response = await fetch('/api/bulk-add-laws', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 법령목록: lawsText })
+                });
+
+                const data = await response.json();
+
+                if (data.성공) {
+                    let html = `<div class="result-box result-success">
+                        <h3>✅ 일괄 추가 완료!</h3>
+                        <p>총 ${data.총개수}개 중 성공: ${data.성공개수}개, 실패: ${data.실패개수}개, 건너뛰기: ${data.건너뛰기개수}개</p>
+                    `;
+
+                    if (data.결과.성공.length > 0) {
+                        html += '<h4>✅ 추가된 법령:</h4><ul>';
+                        data.결과.성공.forEach(law => {
+                            html += `<li class="result-item">${law}</li>`;
+                        });
+                        html += '</ul>';
+                    }
+
+                    if (data.결과.건너뛰기.length > 0) {
+                        html += '<h4>⏭️ 이미 추적 중:</h4><ul>';
+                        data.결과.건너뛰기.forEach(law => {
+                            html += `<li class="result-item">${law}</li>`;
+                        });
+                        html += '</ul>';
+                    }
+
+                    if (data.결과.실패.length > 0) {
+                        html += '<h4>❌ 실패:</h4><ul>';
+                        data.결과.실패.forEach(law => {
+                            html += `<li class="result-item">${law}</li>`;
+                        });
+                        html += '</ul>';
+                    }
+
+                    html += '</div>';
+                    resultDiv.innerHTML = html;
+
+                    // 입력창 비우기
+                    textarea.value = '';
+
+                    // 목록 새로고침
+                    loadStats();
+                    loadLaws();
+                } else {
+                    resultDiv.innerHTML = `<div class="result-box result-error">
+                        <h3>❌ 오류 발생</h3>
+                        <p>${data.오류}</p>
+                    </div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="result-box result-error">
+                    <h3>❌ 오류 발생</h3>
+                    <p>${error.message}</p>
+                </div>`;
+            }
+        }
+
+        // 파일 업로드
+        async function uploadFile() {
+            const fileInput = document.getElementById('file-input');
+            const file = fileInput.files[0];
+            const resultDiv = document.getElementById('file-result');
+
+            if (!file) {
+                alert('파일을 선택해주세요');
+                return;
+            }
+
+            resultDiv.innerHTML = '<div class="loading show"><div class="spinner"></div><p>파일 업로드 및 법령 추가 중...</p></div>';
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/api/upload-file', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.성공) {
+                    let html = `<div class="result-box result-success">
+                        <h3>✅ 파일 업로드 완료!</h3>
+                        <p>총 ${data.총개수}개 중 성공: ${data.성공개수}개, 실패: ${data.실패개수}개, 건너뛰기: ${data.건너뛰기개수}개</p>
+                    `;
+
+                    if (data.결과.성공.length > 0) {
+                        html += '<h4>✅ 추가된 법령:</h4><ul>';
+                        data.결과.성공.forEach(law => {
+                            html += `<li class="result-item">${law}</li>`;
+                        });
+                        html += '</ul>';
+                    }
+
+                    if (data.결과.건너뛰기.length > 0) {
+                        html += '<h4>⏭️ 이미 추적 중:</h4><ul>';
+                        data.결과.건너뛰기.forEach(law => {
+                            html += `<li class="result-item">${law}</li>`;
+                        });
+                        html += '</ul>';
+                    }
+
+                    if (data.결과.실패.length > 0) {
+                        html += '<h4>❌ 실패:</h4><ul>';
+                        data.결과.실패.forEach(law => {
+                            html += `<li class="result-item">${law}</li>`;
+                        });
+                        html += '</ul>';
+                    }
+
+                    html += '</div>';
+                    resultDiv.innerHTML = html;
+
+                    // 파일 입력 초기화
+                    fileInput.value = '';
+
+                    // 목록 새로고침
+                    loadStats();
+                    loadLaws();
+                } else {
+                    resultDiv.innerHTML = `<div class="result-box result-error">
+                        <h3>❌ 오류 발생</h3>
+                        <p>${data.오류}</p>
+                    </div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="result-box result-error">
+                    <h3>❌ 오류 발생</h3>
+                    <p>${error.message}</p>
+                </div>`;
             }
         }
 
