@@ -11,7 +11,13 @@ from pathlib import Path
 class LawHierarchy:
     """법령 체계 및 관계 관리 클래스"""
 
-    def __init__(self):
+    def __init__(self, data_dir: str = "data"):
+        self.data_dir = Path(data_dir)
+        self.scraped_relationships_file = self.data_dir / "law_relationships.json"
+
+        # 크롤링된 관계 데이터 로드
+        self.scraped_relationships = self._load_scraped_relationships()
+
         # 법령 카테고리 정의
         self.categories = {
             "헌법": {"level": 0, "color": "#8B0000", "description": "대한민국 헌법"},
@@ -353,6 +359,17 @@ class LawHierarchy:
             }
         }
 
+    def _load_scraped_relationships(self) -> Dict:
+        """크롤링된 법령 관계 데이터 로드"""
+        if self.scraped_relationships_file.exists():
+            try:
+                with open(self.scraped_relationships_file, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except Exception as e:
+                print(f"⚠️  크롤링 데이터 로드 실패: {e}")
+                return {}
+        return {}
+
     def get_law_info(self, law_name: str) -> Dict:
         """특정 법령의 정보 반환"""
         # 완전 일치 먼저 시도
@@ -381,9 +398,38 @@ class LawHierarchy:
         }
 
     def get_related_laws(self, law_name: str) -> List[str]:
-        """특정 법령과 관련된 법령 목록 반환"""
+        """특정 법령과 관련된 법령 목록 반환 (크롤링 데이터 우선)"""
+        related = []
+
+        # 1. 크롤링 데이터에서 관계 찾기 (우선순위)
+        if law_name in self.scraped_relationships:
+            scraped = self.scraped_relationships[law_name]
+            # 상위법령, 하위법령, 관련법령 모두 포함
+            for law in scraped.get("상위법령", []):
+                if isinstance(law, dict) and "법령명" in law:
+                    related.append(law["법령명"])
+                elif isinstance(law, str):
+                    related.append(law)
+
+            for law in scraped.get("하위법령", []):
+                if isinstance(law, dict) and "법령명" in law:
+                    related.append(law["법령명"])
+                elif isinstance(law, str):
+                    related.append(law)
+
+            for law in scraped.get("관련법령", []):
+                if isinstance(law, dict) and "법령명" in law:
+                    related.append(law["법령명"])
+                elif isinstance(law, str):
+                    related.append(law)
+
+        # 2. 하드코딩된 관계에서 추가 (중복 제거)
         law_info = self.get_law_info(law_name)
-        return law_info.get("related", [])
+        for law in law_info.get("related", []):
+            if law not in related:
+                related.append(law)
+
+        return related
 
     def generate_graph_data(self, tracked_laws: List[str],
                            updated_laws: List[str] = None) -> Dict:
@@ -505,6 +551,11 @@ class LawHierarchy:
             for law_name, law_info in self.laws.items()
             if law_info["category"] == category
         ]
+
+    def reload_scraped_relationships(self):
+        """크롤링된 관계 데이터 다시 로드"""
+        self.scraped_relationships = self._load_scraped_relationships()
+        print(f"✅ 크롤링 데이터 재로드 완료: {len(self.scraped_relationships)}개 법령")
 
 
 def main():
