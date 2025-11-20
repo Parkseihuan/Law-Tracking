@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>법령 체계도 - 법령 추적 시스템</title>
+    <title>법령 체계도</title>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
         * {
@@ -13,75 +13,55 @@
         }
 
         body {
-            font-family: 'Segoe UI', 'Malgun Gothic', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Malgun Gothic', sans-serif;
+            background: #f8f9fa;
             overflow: hidden;
         }
 
         #header {
-            background: rgba(255, 255, 255, 0.95);
-            padding: 20px 30px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            background: white;
+            padding: 15px 25px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
 
         #header h1 {
-            font-size: 28px;
+            font-size: 22px;
             color: #333;
-            display: flex;
-            align-items: center;
-            gap: 10px;
         }
 
         #controls {
             display: flex;
-            gap: 15px;
-            align-items: center;
+            gap: 10px;
         }
 
         .btn {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 5px;
+            padding: 8px 16px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
             cursor: pointer;
             font-size: 14px;
-            font-weight: bold;
-            transition: all 0.3s;
+            background: white;
+            transition: all 0.2s;
         }
 
-        .btn-primary {
-            background: #667eea;
-            color: white;
-        }
-
-        .btn-primary:hover {
-            background: #5568d3;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-        }
-
-        .btn-secondary {
-            background: #48bb78;
-            color: white;
-        }
-
-        .btn-secondary:hover {
-            background: #38a169;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(72, 187, 120, 0.4);
+        .btn:hover {
+            background: #f0f0f0;
+            border-color: #999;
         }
 
         #container {
             position: relative;
             width: 100%;
-            height: calc(100vh - 80px);
+            height: calc(100vh - 60px);
         }
 
         #graph {
             width: 100%;
             height: 100%;
+            background: white;
         }
 
         .node {
@@ -90,112 +70,112 @@
 
         .node circle {
             stroke: #fff;
-            stroke-width: 3px;
-            transition: all 0.3s;
+            stroke-width: 2px;
         }
 
         .node:hover circle {
-            stroke-width: 5px;
-            filter: brightness(1.2);
+            stroke-width: 3px;
         }
 
         .node.tracked circle {
-            stroke: #FFD700;
-            stroke-width: 4px;
+            stroke: #ffc107;
+            stroke-width: 3px;
         }
 
         .node.updated circle {
-            stroke: #FF4500;
-            stroke-width: 5px;
+            stroke: #dc3545;
+            stroke-width: 4px;
             animation: pulse 1.5s infinite;
         }
 
         @keyframes pulse {
             0%, 100% {
                 opacity: 1;
-                transform: scale(1);
             }
             50% {
-                opacity: 0.7;
-                transform: scale(1.1);
+                opacity: 0.6;
             }
         }
 
         .node text {
-            font-size: 12px;
+            font-size: 11px;
             font-weight: bold;
             fill: #333;
             text-anchor: middle;
             pointer-events: none;
-            text-shadow: 0 0 3px white, 0 0 3px white, 0 0 3px white;
+            user-select: none;
         }
 
         .link {
-            stroke: rgba(255, 255, 255, 0.3);
-            stroke-width: 2px;
+            stroke: #999;
+            stroke-width: 1px;
+            stroke-opacity: 0.4;
             fill: none;
         }
 
         .link.active {
-            stroke: rgba(255, 215, 0, 0.8);
-            stroke-width: 3px;
+            stroke: #ffc107;
+            stroke-width: 2px;
+            stroke-opacity: 0.8;
         }
 
         #legend {
             position: absolute;
-            top: 20px;
-            right: 20px;
-            background: rgba(255, 255, 255, 0.95);
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-            min-width: 250px;
+            top: 15px;
+            right: 15px;
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            min-width: 200px;
         }
 
         #legend h3 {
-            margin-bottom: 15px;
+            margin-bottom: 12px;
             color: #333;
-            font-size: 18px;
-            border-bottom: 2px solid #667eea;
-            padding-bottom: 10px;
+            font-size: 14px;
+            font-weight: bold;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 8px;
         }
 
         .legend-item {
             display: flex;
             align-items: center;
-            margin: 10px 0;
-            gap: 10px;
+            margin: 8px 0;
+            gap: 8px;
+            font-size: 12px;
         }
 
         .legend-color {
-            width: 24px;
-            height: 24px;
+            width: 20px;
+            height: 20px;
             border-radius: 50%;
             border: 2px solid #fff;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
         }
 
         .legend-status {
             display: flex;
             align-items: center;
             gap: 8px;
-            margin: 12px 0;
+            margin: 8px 0;
+            font-size: 12px;
         }
 
         .status-indicator {
-            width: 20px;
-            height: 20px;
+            width: 18px;
+            height: 18px;
             border-radius: 50%;
+            background: white;
         }
 
         .status-tracked {
-            background: #fff;
-            border: 3px solid #FFD700;
+            border: 3px solid #ffc107;
         }
 
         .status-updated {
-            background: #fff;
-            border: 3px solid #FF4500;
+            border: 3px solid #dc3545;
             animation: pulse 1.5s infinite;
         }
 
@@ -206,15 +186,15 @@
 
         #tooltip {
             position: absolute;
-            padding: 12px 16px;
-            background: rgba(0, 0, 0, 0.9);
+            padding: 10px 12px;
+            background: rgba(0, 0, 0, 0.85);
             color: white;
-            border-radius: 8px;
+            border-radius: 4px;
             pointer-events: none;
             opacity: 0;
-            transition: opacity 0.3s;
-            font-size: 14px;
-            max-width: 300px;
+            transition: opacity 0.2s;
+            font-size: 12px;
+            max-width: 250px;
             z-index: 1000;
         }
 
@@ -223,47 +203,47 @@
         }
 
         #tooltip h4 {
-            margin-bottom: 5px;
-            color: #FFD700;
-            font-size: 16px;
+            margin-bottom: 4px;
+            color: #ffc107;
+            font-size: 13px;
         }
 
         #tooltip p {
-            margin: 3px 0;
-            font-size: 13px;
+            margin: 2px 0;
+            font-size: 11px;
         }
 
         #info-panel {
             position: absolute;
-            bottom: 20px;
-            left: 20px;
-            background: rgba(255, 255, 255, 0.95);
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-            max-width: 350px;
+            bottom: 15px;
+            left: 15px;
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
         }
 
         #info-panel h3 {
             margin-bottom: 10px;
             color: #333;
-            font-size: 16px;
+            font-size: 14px;
+            font-weight: bold;
         }
 
         .stat-item {
             display: flex;
             justify-content: space-between;
-            padding: 8px 0;
-            border-bottom: 1px solid #eee;
+            padding: 6px 0;
+            font-size: 12px;
+            gap: 20px;
         }
 
         .stat-label {
             color: #666;
-            font-weight: bold;
         }
 
         .stat-value {
-            color: #667eea;
+            color: #007bff;
             font-weight: bold;
         }
 
@@ -272,19 +252,18 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            font-size: 24px;
-            color: white;
             text-align: center;
+            color: #666;
         }
 
         .spinner {
-            border: 4px solid rgba(255, 255, 255, 0.3);
-            border-top: 4px solid white;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #007bff;
             border-radius: 50%;
-            width: 50px;
-            height: 50px;
+            width: 40px;
+            height: 40px;
             animation: spin 1s linear infinite;
-            margin: 0 auto 20px;
+            margin: 0 auto 15px;
         }
 
         @keyframes spin {
@@ -295,13 +274,10 @@
 </head>
 <body>
     <div id="header">
-        <h1>
-            <span style="font-size: 32px;">⚖️</span>
-            법령 체계도
-        </h1>
+        <h1>⚖️ 법령 체계도</h1>
         <div id="controls">
-            <button class="btn btn-secondary" onclick="resetView()">🔄 초기화</button>
-            <button class="btn btn-primary" onclick="location.href='/'">🏠 대시보드</button>
+            <button class="btn" onclick="resetView()">초기화</button>
+            <button class="btn" onclick="location.href='/'">대시보드</button>
         </div>
     </div>
 
@@ -313,15 +289,9 @@
         <svg id="graph"></svg>
 
         <div id="legend">
-            <h3>📊 범례</h3>
-
-            <div style="margin-bottom: 20px;">
-                <h4 style="font-size: 14px; margin-bottom: 10px; color: #666;">카테고리</h4>
-                <div id="category-legend"></div>
-            </div>
-
-            <div>
-                <h4 style="font-size: 14px; margin-bottom: 10px; color: #666;">상태</h4>
+            <h3>범례</h3>
+            <div id="category-legend"></div>
+            <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #eee;">
                 <div class="legend-status">
                     <div class="status-indicator status-updated"></div>
                     <span>업데이트됨</span>
@@ -338,7 +308,7 @@
         </div>
 
         <div id="info-panel">
-            <h3>📈 통계</h3>
+            <h3>통계</h3>
             <div class="stat-item">
                 <span class="stat-label">전체 법령</span>
                 <span class="stat-value" id="total-laws">0</span>
@@ -351,7 +321,7 @@
                 <span class="stat-label">업데이트됨</span>
                 <span class="stat-value" id="updated-laws">0</span>
             </div>
-            <div class="stat-item" style="border-bottom: none;">
+            <div class="stat-item">
                 <span class="stat-label">관련 법령</span>
                 <span class="stat-value" id="related-laws">0</span>
             </div>
@@ -385,7 +355,7 @@
             } catch (error) {
                 console.error('데이터 로딩 실패:', error);
                 document.getElementById('loading').innerHTML =
-                    '<div style="color: #ff6b6b;">❌ 데이터 로딩 실패</div>';
+                    '<div style="color: #dc3545;">데이터 로딩 실패</div>';
             }
         }
 
@@ -409,10 +379,7 @@
                 item.className = 'legend-item';
                 item.innerHTML = `
                     <div class="legend-color" style="background: ${info.color}"></div>
-                    <div>
-                        <div style="font-weight: bold; font-size: 13px;">${name}</div>
-                        <div style="font-size: 11px; color: #666;">${info.description}</div>
-                    </div>
+                    <div style="font-weight: 500;">${name}</div>
                 `;
                 legendDiv.appendChild(item);
             });
@@ -420,7 +387,7 @@
 
         function createGraph(data) {
             const width = window.innerWidth;
-            const height = window.innerHeight - 80;
+            const height = window.innerHeight - 60;
 
             svg = d3.select('#graph')
                 .attr('width', width)
@@ -428,7 +395,7 @@
 
             // 줌 기능
             zoom = d3.zoom()
-                .scaleExtent([0.1, 4])
+                .scaleExtent([0.3, 3])
                 .on('zoom', (event) => {
                     g.attr('transform', event.transform);
                 });
@@ -439,10 +406,10 @@
 
             // Force simulation
             simulation = d3.forceSimulation(data.nodes)
-                .force('link', d3.forceLink(data.links).id(d => d.id).distance(120))
-                .force('charge', d3.forceManyBody().strength(-300))
+                .force('link', d3.forceLink(data.links).id(d => d.id).distance(100))
+                .force('charge', d3.forceManyBody().strength(-250))
                 .force('center', d3.forceCenter(width / 2, height / 2))
-                .force('collision', d3.forceCollide().radius(50));
+                .force('collision', d3.forceCollide().radius(40));
 
             // 링크 그리기
             link = g.append('g')
@@ -465,15 +432,15 @@
             // 원 그리기
             nodeGroup.append('circle')
                 .attr('r', d => {
-                    if (d.status === 'updated') return 20;
-                    if (d.status === 'tracked') return 18;
-                    return 15;
+                    if (d.status === 'updated') return 18;
+                    if (d.status === 'tracked') return 16;
+                    return 14;
                 })
                 .attr('fill', d => d.color);
 
             // 텍스트 그리기
             nodeGroup.append('text')
-                .attr('dy', -25)
+                .attr('dy', -22)
                 .text(d => d.name);
 
             // 툴팁 이벤트
@@ -485,9 +452,6 @@
                 .on('mouseout', function(event, d) {
                     hideTooltip();
                     unhighlightConnections();
-                })
-                .on('click', function(event, d) {
-                    console.log('클릭:', d);
                 });
 
             node = nodeGroup;
@@ -510,7 +474,7 @@
 
             // 연결된 노드 강조
             node.style('opacity', n => {
-                const connected = data.links.some(l =>
+                const connected = graphData.links.some(l =>
                     (l.source.id === d.id && l.target.id === n.id) ||
                     (l.target.id === d.id && l.source.id === n.id) ||
                     n.id === d.id
@@ -535,7 +499,7 @@
                 <h4>${d.name}</h4>
                 <p><strong>카테고리:</strong> ${d.category}</p>
                 <p><strong>상태:</strong> ${statusText}</p>
-                <p style="margin-top: 8px;">${d.description}</p>
+                <p style="margin-top: 6px;">${d.description}</p>
             `;
 
             tooltip.style.left = (event.pageX + 15) + 'px';
@@ -575,7 +539,7 @@
         // 윈도우 리사이즈 처리
         window.addEventListener('resize', () => {
             const width = window.innerWidth;
-            const height = window.innerHeight - 80;
+            const height = window.innerHeight - 60;
 
             svg.attr('width', width).attr('height', height);
             simulation.force('center', d3.forceCenter(width / 2, height / 2));
@@ -584,7 +548,13 @@
 
         // 자동 새로고침 (30초마다)
         setInterval(() => {
-            loadGraphData();
+            fetch('/api/law-hierarchy')
+                .then(response => response.json())
+                .then(data => {
+                    graphData = data;
+                    updateStats(data);
+                })
+                .catch(error => console.error('자동 새로고침 실패:', error));
         }, 30000);
     </script>
 </body>
