@@ -1,0 +1,378 @@
+{% extends "adminlte/base.html" %}
+
+{% block title %}대시보드 - 법령 추적 시스템{% endblock %}
+{% block page_title %}대시보드{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="/">홈</a></li>
+<li class="breadcrumb-item active">대시보드</li>
+{% endblock %}
+
+{% block content %}
+<!-- Small boxes (Stat box) -->
+<div class="row">
+    <div class="col-lg-3 col-6">
+        <!-- small box -->
+        <div class="small-box bg-info">
+            <div class="inner">
+                <h3 id="stat-total-laws">0</h3>
+                <p>추적 중인 법령</p>
+            </div>
+            <div class="icon">
+                <i class="fas fa-gavel"></i>
+            </div>
+            <a href="/laws" class="small-box-footer">상세보기 <i class="fas fa-arrow-circle-right"></i></a>
+        </div>
+    </div>
+
+    <div class="col-lg-3 col-6">
+        <!-- small box -->
+        <div class="small-box bg-success">
+            <div class="inner">
+                <h3 id="stat-updated-laws">0</h3>
+                <p>업데이트된 법령</p>
+            </div>
+            <div class="icon">
+                <i class="fas fa-sync-alt"></i>
+            </div>
+            <a href="/updates" class="small-box-footer">상세보기 <i class="fas fa-arrow-circle-right"></i></a>
+        </div>
+    </div>
+
+    <div class="col-lg-3 col-6">
+        <!-- small box -->
+        <div class="small-box bg-warning">
+            <div class="inner">
+                <h3 id="stat-categories" class="text-white">0</h3>
+                <p class="text-white">법령 카테고리</p>
+            </div>
+            <div class="icon">
+                <i class="fas fa-folder"></i>
+            </div>
+            <a href="/hierarchy" class="small-box-footer">체계도 보기 <i class="fas fa-arrow-circle-right"></i></a>
+        </div>
+    </div>
+
+    <div class="col-lg-3 col-6">
+        <!-- small box -->
+        <div class="small-box bg-danger">
+            <div class="inner">
+                <h3 id="stat-last-check">-</h3>
+                <p>마지막 확인</p>
+            </div>
+            <div class="icon">
+                <i class="fas fa-clock"></i>
+            </div>
+            <a href="#" class="small-box-footer" onclick="checkNow(); return false;">지금 확인 <i class="fas fa-arrow-circle-right"></i></a>
+        </div>
+    </div>
+</div>
+
+<!-- Main row -->
+<div class="row">
+    <!-- Left col -->
+    <section class="col-lg-7 connectedSortable">
+        <!-- 최근 업데이트된 법령 -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-history mr-1"></i>
+                    최근 업데이트된 법령
+                </h3>
+                <div class="card-tools">
+                    <button type="button" class="btn btn-tool" onclick="refreshUpdates()">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <table id="recent-updates-table" class="table table-bordered table-striped">
+                    <thead>
+                    <tr>
+                        <th>법령명</th>
+                        <th>변경횟수</th>
+                        <th>마지막 확인</th>
+                    </tr>
+                    </thead>
+                    <tbody id="recent-updates-tbody">
+                    <tr>
+                        <td colspan="3" class="text-center text-muted">데이터 로딩 중...</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 법령 변경 추이 차트 -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-chart-line mr-1"></i>
+                    법령 변경 추이
+                </h3>
+            </div>
+            <div class="card-body">
+                <canvas id="update-trend-chart" height="100"></canvas>
+            </div>
+        </div>
+    </section>
+
+    <!-- Right col -->
+    <section class="col-lg-5 connectedSortable">
+        <!-- 카테고리별 법령 분포 -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-chart-pie mr-1"></i>
+                    카테고리별 법령 분포
+                </h3>
+            </div>
+            <div class="card-body">
+                <canvas id="category-chart" height="200"></canvas>
+            </div>
+        </div>
+
+        <!-- 추적 법령 목록 -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-list mr-1"></i>
+                    추적 법령 요약
+                </h3>
+                <div class="card-tools">
+                    <a href="/laws" class="btn btn-tool btn-sm">
+                        <i class="fas fa-external-link-alt"></i>
+                    </a>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <ul class="products-list product-list-in-card pl-2 pr-2" id="tracked-laws-list">
+                    <li class="item">
+                        <div class="product-info">
+                            <span class="product-description text-muted">
+                                데이터 로딩 중...
+                            </span>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let updateTrendChart = null;
+let categoryChart = null;
+
+// 통계 데이터 로드
+function loadStatistics() {
+    fetch('/api/statistics')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('stat-total-laws').textContent = data.total_laws || 0;
+            document.getElementById('stat-updated-laws').textContent = data.updated_laws || 0;
+            document.getElementById('stat-categories').textContent = data.categories || 0;
+
+            if (data.last_check) {
+                const date = new Date(data.last_check);
+                const hours = date.getHours().toString().padStart(2, '0');
+                const minutes = date.getMinutes().toString().padStart(2, '0');
+                document.getElementById('stat-last-check').textContent = `${hours}:${minutes}`;
+            }
+        })
+        .catch(err => console.error('통계 로드 실패:', err));
+}
+
+// 최근 업데이트 로드
+function refreshUpdates() {
+    fetch('/api/law-updates')
+        .then(response => response.json())
+        .then(data => {
+            const tbody = document.getElementById('recent-updates-tbody');
+
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">업데이트된 법령이 없습니다</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = data.slice(0, 10).map(law => `
+                <tr>
+                    <td><strong>${law.법령명}</strong></td>
+                    <td><span class="badge badge-warning">${law.변경횟수}건</span></td>
+                    <td>${law.마지막확인 || '-'}</td>
+                </tr>
+            `).join('');
+        })
+        .catch(err => console.error('업데이트 목록 로드 실패:', err));
+}
+
+// 추적 법령 목록 로드
+function loadTrackedLaws() {
+    fetch('/api/laws')
+        .then(response => response.json())
+        .then(data => {
+            const list = document.getElementById('tracked-laws-list');
+
+            if (data.length === 0) {
+                list.innerHTML = '<li class="item"><div class="product-info"><span class="product-description text-muted">추적 중인 법령이 없습니다</span></div></li>';
+                return;
+            }
+
+            list.innerHTML = data.slice(0, 10).map(law => `
+                <li class="item">
+                    <div class="product-info">
+                        <a href="#" class="product-title">${law.법령명}</a>
+                        <span class="product-description">
+                            ${law.변경횟수 > 0 ? `<span class="badge badge-warning float-right">${law.변경횟수}건 업데이트</span>` : ''}
+                        </span>
+                    </div>
+                </li>
+            `).join('');
+        })
+        .catch(err => console.error('법령 목록 로드 실패:', err));
+}
+
+// 차트 초기화
+function initCharts() {
+    // 변경 추이 차트
+    const ctxTrend = document.getElementById('update-trend-chart').getContext('2d');
+    updateTrendChart = new Chart(ctxTrend, {
+        type: 'line',
+        data: {
+            labels: ['1일전', '2일전', '3일전', '4일전', '5일전', '6일전', '오늘'],
+            datasets: [{
+                label: '법령 변경 건수',
+                data: [0, 0, 0, 0, 0, 0, 0],
+                borderColor: 'rgb(75, 192, 192)',
+                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                tension: 0.1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    display: true
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            }
+        }
+    });
+
+    // 카테고리별 분포 차트
+    const ctxCategory = document.getElementById('category-chart').getContext('2d');
+    categoryChart = new Chart(ctxCategory, {
+        type: 'doughnut',
+        data: {
+            labels: [],
+            datasets: [{
+                data: [],
+                backgroundColor: [
+                    '#8B0000', '#1E90FF', '#32CD32', '#FF8C00', '#9370DB',
+                    '#DC143C', '#4682B4', '#20B2AA', '#DAA520', '#C71585'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+
+    // 차트 데이터 로드
+    loadChartData();
+}
+
+// 차트 데이터 로드
+function loadChartData() {
+    fetch('/api/law-hierarchy')
+        .then(response => response.json())
+        .then(data => {
+            // 카테고리별 분포 업데이트
+            const categories = {};
+            data.nodes.forEach(node => {
+                categories[node.category] = (categories[node.category] || 0) + 1;
+            });
+
+            categoryChart.data.labels = Object.keys(categories);
+            categoryChart.data.datasets[0].data = Object.values(categories);
+            categoryChart.update();
+        })
+        .catch(err => console.error('차트 데이터 로드 실패:', err));
+}
+
+// 지금 확인 버튼
+function checkNow() {
+    const btn = event.target;
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 확인 중...';
+    btn.disabled = true;
+
+    fetch('/api/check-updates', { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+            loadStatistics();
+            refreshUpdates();
+            alert(`확인 완료!\n업데이트: ${data.updated || 0}건`);
+        })
+        .catch(err => {
+            console.error('확인 실패:', err);
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+            alert('확인 중 오류가 발생했습니다.');
+        });
+}
+
+// 페이지 로드 시 실행
+$(document).ready(function() {
+    loadStatistics();
+    refreshUpdates();
+    loadTrackedLaws();
+    initCharts();
+
+    // DataTable 초기화
+    $('#recent-updates-table').DataTable({
+        "paging": true,
+        "lengthChange": false,
+        "searching": false,
+        "ordering": true,
+        "info": true,
+        "autoWidth": false,
+        "responsive": true,
+        "pageLength": 5,
+        "language": {
+            "info": "_START_-_END_ / _TOTAL_건",
+            "paginate": {
+                "previous": "이전",
+                "next": "다음"
+            }
+        }
+    });
+
+    // 10분마다 자동 새로고침
+    setInterval(() => {
+        loadStatistics();
+        refreshUpdates();
+        loadTrackedLaws();
+        loadChartData();
+    }, 600000);
+});
+</script>
+{% endblock %}

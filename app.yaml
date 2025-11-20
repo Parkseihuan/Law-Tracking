@@ -1,0 +1,39 @@
+# Google Cloud App Engine 배포 설정 파일
+
+runtime: python311  # Python 3.11 사용
+
+instance_class: F1  # 기본 인스턴스 클래스 (무료 티어)
+
+# 환경 변수
+env_variables:
+  FLASK_APP: "web_dashboard_adminlte.py"
+  FLASK_ENV: "production"
+  # LAW_API_KEY는 Google Cloud Secret Manager 사용 권장
+
+# 자동 스케일링 설정
+automatic_scaling:
+  min_instances: 0  # 비용 절감을 위해 0으로 설정
+  max_instances: 2
+  target_cpu_utilization: 0.65
+  target_throughput_utilization: 0.65
+
+# 진입점
+entrypoint: gunicorn -b :$PORT web_dashboard_adminlte:app
+
+# 핸들러 설정
+handlers:
+  # 정적 파일 (CDN 사용으로 필요 없음)
+  - url: /static
+    static_dir: static
+    secure: always
+
+  # 모든 요청을 Flask 앱으로
+  - url: /.*
+    script: auto
+    secure: always
+
+# 리소스 설정
+resources:
+  cpu: 1
+  memory_gb: 0.5
+  disk_size_gb: 10
