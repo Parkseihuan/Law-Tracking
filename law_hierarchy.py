@@ -24,7 +24,9 @@ class LawHierarchy:
             "특별교육": {"level": 2, "color": "#20B2AA", "description": "특수·영재 교육"},
             "교육시설": {"level": 2, "color": "#DAA520", "description": "학원·도서관 등"},
             "산학협력": {"level": 2, "color": "#8B4513", "description": "산학협력·평생학습"},
-            "시행령/규칙": {"level": 3, "color": "#708090", "description": "하위 법령"}
+            "노동법": {"level": 2, "color": "#C71585", "description": "근로·노동 관계"},
+            "시행령/규칙": {"level": 3, "color": "#708090", "description": "하위 법령"},
+            "기타": {"level": 2, "color": "#A9A9A9", "description": "기타 법령"}
         }
 
         # 법령 정의 및 관계 매핑
@@ -166,6 +168,13 @@ class LawHierarchy:
                 "category": "산학협력",
                 "description": "학점인정 등에 관한 법률",
                 "related": ["평생교육법", "고등교육법", "학점인정법 시행령"]
+            },
+
+            # 노동법
+            "근로기준법": {
+                "category": "노동법",
+                "description": "근로조건의 기준",
+                "related": ["근로기준법 시행령", "근로기준법 시행규칙"]
             },
 
             # ===== 시행령/규칙 =====
@@ -329,6 +338,18 @@ class LawHierarchy:
                 "category": "시행령/규칙",
                 "description": "학점인정법 시행령",
                 "related": ["학점인정법"]
+            },
+
+            # 노동법 관련 시행령
+            "근로기준법 시행령": {
+                "category": "시행령/규칙",
+                "description": "근로기준법 시행령",
+                "related": ["근로기준법"]
+            },
+            "근로기준법 시행규칙": {
+                "category": "시행령/규칙",
+                "description": "근로기준법 시행규칙",
+                "related": ["근로기준법"]
             }
         }
 
@@ -410,19 +431,52 @@ class LawHierarchy:
             node_ids.add(full_name)
 
         # 링크 생성
+        created_links = set()  # 중복 방지용
+
         for law_name in laws_to_process:
             law_info = self.get_law_info(law_name)
             source = law_info.get("full_name", law_name)
 
+            # 1. 정의된 관계에서 링크 생성
             for related_law in law_info.get("related", []):
-                # 양방향 링크 중복 방지
                 if related_law in node_ids:
-                    # source < target 순서로 정렬하여 중복 방지
-                    if source < related_law:
+                    link_pair = tuple(sorted([source, related_law]))
+                    if link_pair not in created_links:
+                        created_links.add(link_pair)
                         links.append({
-                            "source": source,
-                            "target": related_law
+                            "source": link_pair[0],
+                            "target": link_pair[1]
                         })
+
+            # 2. 자동 관계 추론 (법률-시행령-시행규칙)
+            for other_law in laws_to_process:
+                if other_law == law_name:
+                    continue
+
+                # "XXX법"과 "XXX법 시행령" 자동 연결
+                if (source.endswith("법") and
+                    (other_law == f"{source} 시행령" or
+                     other_law == f"{source} 시행규칙" or
+                     other_law.startswith(source))):
+                    link_pair = tuple(sorted([source, other_law]))
+                    if link_pair not in created_links:
+                        created_links.add(link_pair)
+                        links.append({
+                            "source": link_pair[0],
+                            "target": link_pair[1]
+                        })
+
+                # "XXX법 시행령"과 "XXX법" 자동 연결
+                elif source.endswith("시행령") or source.endswith("시행규칙"):
+                    base_law = source.replace(" 시행령", "").replace(" 시행규칙", "")
+                    if other_law == base_law or other_law.startswith(base_law):
+                        link_pair = tuple(sorted([source, other_law]))
+                        if link_pair not in created_links:
+                            created_links.add(link_pair)
+                            links.append({
+                                "source": link_pair[0],
+                                "target": link_pair[1]
+                            })
 
         # 카테고리 정보도 포함
         categories_used = {}
