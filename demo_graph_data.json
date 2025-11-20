@@ -1,0 +1,142 @@
+{
+  "nodes": [
+    {
+      "id": "근로기준법",
+      "name": "근로기준법",
+      "category": "노동법",
+      "description": "근로조건의 기준",
+      "color": "#C71585",
+      "level": 2,
+      "status": "updated"
+    },
+    {
+      "id": "사립학교법",
+      "name": "사립학교법",
+      "category": "학교운영",
+      "description": "사립학교 설립·운영",
+      "color": "#9370DB",
+      "level": 2,
+      "status": "updated"
+    },
+    {
+      "id": "교육기본법",
+      "name": "교육기본법",
+      "category": "교육기본법",
+      "description": "교육의 기본 이념과 방향",
+      "color": "#1E90FF",
+      "level": 1,
+      "status": "tracked"
+    },
+    {
+      "id": "교육공무원법 시행령",
+      "name": "교육공무원법 시행령",
+      "category": "시행령/규칙",
+      "description": "교육공무원법 시행령",
+      "color": "#708090",
+      "level": 3,
+      "status": "tracked"
+    },
+    {
+      "id": "근로기준법 시행령",
+      "name": "근로기준법 시행령",
+      "category": "시행령/규칙",
+      "description": "근로기준법 시행령",
+      "color": "#708090",
+      "level": 3,
+      "status": "tracked"
+    },
+    {
+      "id": "사립학교법 시행령",
+      "name": "사립학교법 시행령",
+      "category": "시행령/규칙",
+      "description": "사립학교법 시행령",
+      "color": "#708090",
+      "level": 3,
+      "status": "tracked"
+    },
+    {
+      "id": "교육공무원임용령",
+      "name": "교육공무원임용령",
+      "category": "시행령/규칙",
+      "description": "교육공무원의 임용에 관한 대통령령",
+      "color": "#708090",
+      "level": 3,
+      "status": "tracked"
+    },
+    {
+      "id": "근로기준법 시행규칙",
+      "name": "근로기준법 시행규칙",
+      "category": "시행령/규칙",
+      "description": "근로기준법 시행규칙",
+      "color": "#708090",
+      "level": 3,
+      "status": "tracked"
+    },
+    {
+      "id": "교육공무원법",
+      "name": "교육공무원법",
+      "category": "교원",
+      "description": "교육공무원의 자격·임용·보수",
+      "color": "#FF8C00",
+      "level": 2,
+      "status": "tracked"
+    }
+  ],
+  "links": [
+    {
+      "source": "근로기준법",
+      "target": "근로기준법 시행령"
+    },
+    {
+      "source": "근로기준법",
+      "target": "근로기준법 시행규칙"
+    },
+    {
+      "source": "교육기본법",
+      "target": "사립학교법"
+    },
+    {
+      "source": "사립학교법",
+      "target": "사립학교법 시행령"
+    },
+    {
+      "source": "교육공무원법",
+      "target": "교육공무원법 시행령"
+    },
+    {
+      "source": "근로기준법 시행규칙",
+      "target": "근로기준법 시행령"
+    },
+    {
+      "source": "교육공무원법",
+      "target": "교육공무원임용령"
+    }
+  ],
+  "categories": {
+    "노동법": {
+      "level": 2,
+      "color": "#C71585",
+      "description": "근로·노동 관계"
+    },
+    "학교운영": {
+      "level": 2,
+      "color": "#9370DB",
+      "description": "학교 설립·운영"
+    },
+    "교육기본법": {
+      "level": 1,
+      "color": "#1E90FF",
+      "description": "교육의 기본 원리"
+    },
+    "시행령/규칙": {
+      "level": 3,
+      "color": "#708090",
+      "description": "하위 법령"
+    },
+    "교원": {
+      "level": 2,
+      "color": "#FF8C00",
+      "description": "교원 관련"
+    }
+  }
+}
