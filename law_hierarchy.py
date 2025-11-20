@@ -380,13 +380,8 @@ class LawHierarchy:
         links = []
         node_ids = set()
 
-        # 추적 중인 법령과 관련 법령을 모두 노드로 추가
+        # 추적 중인 법령만 표시
         laws_to_process = set(tracked_laws)
-
-        # 관련 법령도 포함
-        for law in tracked_laws:
-            related = self.get_related_laws(law)
-            laws_to_process.update(related)
 
         # 노드 생성
         for law_name in laws_to_process:
