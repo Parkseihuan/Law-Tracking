@@ -77,7 +77,7 @@ class LawHierarchy:
             "교육공무원법": {
                 "category": "교원",
                 "description": "교육공무원의 자격·임용·보수 등",
-                "related": ["교원지위법", "교육공무원법 시행령"]
+                "related": ["교원지위법", "교육공무원법 시행령", "교육공무원임용령"]
             },
             "사립학교교직원 연금법": {
                 "category": "교원",
@@ -131,6 +131,11 @@ class LawHierarchy:
             "교육공무원법 시행령": {
                 "category": "시행령/규칙",
                 "description": "교육공무원법 시행령",
+                "related": ["교육공무원법"]
+            },
+            "교육공무원임용령": {
+                "category": "시행령/규칙",
+                "description": "교육공무원의 임용에 관한 대통령령",
                 "related": ["교육공무원법"]
             },
             "사립학교교직원 연금법 시행령": {
