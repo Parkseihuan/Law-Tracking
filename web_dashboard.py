@@ -9,6 +9,7 @@ from flask import Flask, render_template, jsonify, request
 from pathlib import Path
 from datetime import datetime
 from law_tracker import LawTracker
+from law_hierarchy import LawHierarchy
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -19,6 +20,7 @@ app.config['JSON_AS_ASCII'] = False  # 한글 지원
 # 전역 변수
 api_key = os.getenv('LAW_API_KEY')
 tracker = LawTracker(api_key) if api_key else None
+hierarchy = LawHierarchy()
 
 
 @app.route('/')
@@ -289,6 +291,38 @@ def get_stats():
     return jsonify(stats)
 
 
+@app.route('/hierarchy')
+def law_hierarchy_page():
+    """법령 체계도 페이지"""
+    return render_template('law_hierarchy.html')
+
+
+@app.route('/api/law-hierarchy')
+def get_law_hierarchy():
+    """법령 체계도 데이터 조회"""
+    if not tracker:
+        return jsonify({"error": "API 키가 설정되지 않았습니다"}), 500
+
+    try:
+        # 추적 중인 법령 목록
+        tracked_laws = list(tracker.tracked_laws.keys())
+
+        # 업데이트된 법령 목록 (변경횟수가 1 이상인 법령)
+        updated_laws = [
+            law_name
+            for law_name, info in tracker.tracked_laws.items()
+            if info.get('변경횟수', 0) > 0
+        ]
+
+        # 그래프 데이터 생성
+        graph_data = hierarchy.generate_graph_data(tracked_laws, updated_laws)
+
+        return jsonify(graph_data)
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 # HTML 템플릿 생성
 def create_templates():
     """템플릿 폴더 및 파일 생성"""
@@ -331,6 +365,33 @@ def create_templates():
         .header h1 {
             font-size: 32px;
             margin-bottom: 10px;
+        }
+
+        .header-controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .header-controls .btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s;
+        }
+
+        .header-controls .btn:hover {
+            background: white;
+            color: #667eea;
+            transform: translateY(-2px);
         }
 
         .stats-grid {
@@ -557,6 +618,12 @@ def create_templates():
         <div class="header">
             <h1>🏛️ 법령 추적 대시보드</h1>
             <p>국가법령정보센터 Open API 기반 법령 개정 모니터링</p>
+            <div class="header-controls">
+                <a href="/hierarchy" class="btn">
+                    <span>⚖️</span>
+                    <span>법령 체계도 보기</span>
+                </a>
+            </div>
         </div>
 
         <!-- 통계 -->
