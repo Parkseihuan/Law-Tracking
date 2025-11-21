@@ -168,8 +168,209 @@ class NotificationService:
 
         return html
 
+    def send_discord_notification(self, changes: List[Dict]) -> bool:
+        """Discord 웹훅 알림 발송"""
+        discord_config = self.config_manager.get("notifications.discord", {})
+
+        if not discord_config.get("enabled"):
+            print("Discord 알림이 비활성화되어 있습니다.")
+            return False
+
+        webhook_url = discord_config.get("webhook_url")
+        if not webhook_url:
+            print("Discord 웹훅 URL이 설정되지 않았습니다.")
+            return False
+
+        try:
+            # 통계 계산
+            new_count = sum(1 for c in changes if c.get("type") == "new")
+            updated_count = sum(1 for c in changes if c.get("type") == "updated")
+            deleted_count = sum(1 for c in changes if c.get("type") == "deleted")
+
+            # Discord Embed 생성
+            embed = {
+                "title": "⚖️ 법령 변경 알림",
+                "description": f"총 **{len(changes)}건**의 변경사항이 발견되었습니다.",
+                "color": 0x667eea,
+                "timestamp": datetime.now().isoformat(),
+                "fields": [
+                    {"name": "🆕 신규", "value": str(new_count), "inline": True},
+                    {"name": "📝 개정", "value": str(updated_count), "inline": True},
+                    {"name": "❌ 폐지", "value": str(deleted_count), "inline": True}
+                ],
+                "footer": {"text": "법령 추적 시스템"}
+            }
+
+            # 변경사항 목록 추가 (최대 5개)
+            if changes:
+                laws_text = ""
+                for i, change in enumerate(changes[:5]):
+                    law_name = change.get("법령명", "알 수 없음")
+                    change_count = change.get("변경횟수", 0)
+                    laws_text += f"• **{law_name}** ({change_count}건)\n"
+
+                if len(changes) > 5:
+                    laws_text += f"\n... 외 {len(changes) - 5}건"
+
+                embed["fields"].append({
+                    "name": "변경된 법령",
+                    "value": laws_text,
+                    "inline": False
+                })
+
+            payload = {
+                "username": "법령 추적 시스템",
+                "embeds": [embed]
+            }
+
+            response = requests.post(webhook_url, json=payload, timeout=10)
+            response.raise_for_status()
+
+            print(f"Discord 알림 발송 완료")
+            return True
+
+        except Exception as e:
+            print(f"Discord 발송 실패: {e}")
+            return False
+
+    def send_telegram_notification(self, changes: List[Dict]) -> bool:
+        """Telegram Bot 알림 발송"""
+        telegram_config = self.config_manager.get("notifications.telegram", {})
+
+        if not telegram_config.get("enabled"):
+            print("Telegram 알림이 비활성화되어 있습니다.")
+            return False
+
+        bot_token = telegram_config.get("bot_token")
+        chat_id = telegram_config.get("chat_id")
+
+        if not bot_token or not chat_id:
+            print("Telegram Bot 토큰 또는 Chat ID가 설정되지 않았습니다.")
+            return False
+
+        try:
+            # 통계 계산
+            new_count = sum(1 for c in changes if c.get("type") == "new")
+            updated_count = sum(1 for c in changes if c.get("type") == "updated")
+            deleted_count = sum(1 for c in changes if c.get("type") == "deleted")
+
+            # Telegram 메시지 생성 (Markdown 형식)
+            message = f"⚖️ *법령 변경 알림*\n\n"
+            message += f"총 *{len(changes)}건*의 변경사항이 발견되었습니다.\n\n"
+            message += f"🆕 신규: {new_count}건\n"
+            message += f"📝 개정: {updated_count}건\n"
+            message += f"❌ 폐지: {deleted_count}건\n\n"
+
+            # 변경사항 목록 (최대 10개)
+            if changes:
+                message += "*변경된 법령:*\n"
+                for i, change in enumerate(changes[:10]):
+                    law_name = change.get("법령명", "알 수 없음")
+                    change_count = change.get("변경횟수", 0)
+                    message += f"• {law_name} ({change_count}건)\n"
+
+                if len(changes) > 10:
+                    message += f"\n... 외 {len(changes) - 10}건"
+
+            message += f"\n\n📅 {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+
+            # Telegram API 호출
+            url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+            payload = {
+                "chat_id": chat_id,
+                "text": message,
+                "parse_mode": "Markdown"
+            }
+
+            response = requests.post(url, json=payload, timeout=10)
+            response.raise_for_status()
+
+            print(f"Telegram 알림 발송 완료")
+            return True
+
+        except Exception as e:
+            print(f"Telegram 발송 실패: {e}")
+            return False
+
+    def send_slack_notification(self, changes: List[Dict]) -> bool:
+        """Slack 웹훅 알림 발송"""
+        slack_config = self.config_manager.get("notifications.slack", {})
+
+        if not slack_config.get("enabled"):
+            print("Slack 알림이 비활성화되어 있습니다.")
+            return False
+
+        webhook_url = slack_config.get("webhook_url")
+        if not webhook_url:
+            print("Slack 웹훅 URL이 설정되지 않았습니다.")
+            return False
+
+        try:
+            # 통계 계산
+            new_count = sum(1 for c in changes if c.get("type") == "new")
+            updated_count = sum(1 for c in changes if c.get("type") == "updated")
+            deleted_count = sum(1 for c in changes if c.get("type") == "deleted")
+
+            # Slack Block Kit 메시지 생성
+            blocks = [
+                {
+                    "type": "header",
+                    "text": {
+                        "type": "plain_text",
+                        "text": "⚖️ 법령 변경 알림"
+                    }
+                },
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"총 *{len(changes)}건*의 변경사항이 발견되었습니다."
+                    }
+                },
+                {
+                    "type": "section",
+                    "fields": [
+                        {"type": "mrkdwn", "text": f"*🆕 신규*\n{new_count}건"},
+                        {"type": "mrkdwn", "text": f"*📝 개정*\n{updated_count}건"},
+                        {"type": "mrkdwn", "text": f"*❌ 폐지*\n{deleted_count}건"},
+                        {"type": "mrkdwn", "text": f"*📅 시간*\n{datetime.now().strftime('%Y-%m-%d %H:%M')}"}
+                    ]
+                }
+            ]
+
+            # 변경사항 목록 추가 (최대 5개)
+            if changes:
+                laws_text = ""
+                for i, change in enumerate(changes[:5]):
+                    law_name = change.get("법령명", "알 수 없음")
+                    change_count = change.get("변경횟수", 0)
+                    laws_text += f"• *{law_name}* ({change_count}건)\n"
+
+                if len(changes) > 5:
+                    laws_text += f"\n... 외 {len(changes) - 5}건"
+
+                blocks.append({
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"*변경된 법령:*\n{laws_text}"
+                    }
+                })
+
+            payload = {"blocks": blocks}
+
+            response = requests.post(webhook_url, json=payload, timeout=10)
+            response.raise_for_status()
+
+            print(f"Slack 알림 발송 완료")
+            return True
+
+        except Exception as e:
+            print(f"Slack 발송 실패: {e}")
+            return False
+
     def send_webhook_notification(self, changes: List[Dict]) -> bool:
-        """웹훅 알림 발송"""
+        """웹훅 알림 발송 (범용)"""
         webhook_config = self.config_manager.get("notifications.webhook", {})
 
         if not webhook_config.get("enabled"):
@@ -206,6 +407,18 @@ class NotificationService:
     def notify_changes(self, changes: List[Dict]) -> Dict[str, bool]:
         """모든 활성화된 알림 채널로 변경사항 전송"""
         results = {}
+
+        # Discord 알림
+        if self.config_manager.get("notifications.discord.enabled"):
+            results["discord"] = self.send_discord_notification(changes)
+
+        # Telegram 알림
+        if self.config_manager.get("notifications.telegram.enabled"):
+            results["telegram"] = self.send_telegram_notification(changes)
+
+        # Slack 알림
+        if self.config_manager.get("notifications.slack.enabled"):
+            results["slack"] = self.send_slack_notification(changes)
 
         # 이메일 알림
         if self.config_manager.get("notifications.email.enabled"):

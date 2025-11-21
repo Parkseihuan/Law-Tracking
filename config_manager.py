@@ -19,6 +19,19 @@ class ConfigManager:
                 "last_run": None
             },
             "notifications": {
+                "discord": {
+                    "enabled": False,
+                    "webhook_url": ""
+                },
+                "telegram": {
+                    "enabled": False,
+                    "bot_token": "",
+                    "chat_id": ""
+                },
+                "slack": {
+                    "enabled": False,
+                    "webhook_url": ""
+                },
                 "email": {
                     "enabled": False,
                     "recipients": [],
