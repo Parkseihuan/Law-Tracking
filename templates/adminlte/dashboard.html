@@ -94,10 +94,7 @@
                         <th>마지막 확인</th>
                     </tr>
                     </thead>
-                    <tbody id="recent-updates-tbody">
-                    <tr>
-                        <td colspan="3" class="text-center text-muted">데이터 로딩 중...</td>
-                    </tr>
+                    <tbody>
                     </tbody>
                 </table>
             </div>
@@ -165,6 +162,7 @@
 <script>
 let updateTrendChart = null;
 let categoryChart = null;
+let updatesTable = null;
 
 // 통계 데이터 로드
 function loadStatistics() {
@@ -190,20 +188,22 @@ function refreshUpdates() {
     fetch('/api/law-updates')
         .then(response => response.json())
         .then(data => {
-            const tbody = document.getElementById('recent-updates-tbody');
+            if (updatesTable) {
+                // DataTable이 이미 초기화된 경우
+                updatesTable.clear();
 
-            if (data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">업데이트된 법령이 없습니다</td></tr>';
-                return;
+                if (data.length > 0) {
+                    data.slice(0, 10).forEach(law => {
+                        updatesTable.row.add([
+                            `<strong>${law.법령명}</strong>`,
+                            `<span class="badge badge-warning">${law.변경횟수}건</span>`,
+                            law.마지막확인 || '-'
+                        ]);
+                    });
+                }
+
+                updatesTable.draw();
             }
-
-            tbody.innerHTML = data.slice(0, 10).map(law => `
-                <tr>
-                    <td><strong>${law.법령명}</strong></td>
-                    <td><span class="badge badge-warning">${law.변경횟수}건</span></td>
-                    <td>${law.마지막확인 || '-'}</td>
-                </tr>
-            `).join('');
         })
         .catch(err => console.error('업데이트 목록 로드 실패:', err));
 }
@@ -342,13 +342,8 @@ function checkNow() {
 
 // 페이지 로드 시 실행
 $(document).ready(function() {
-    loadStatistics();
-    refreshUpdates();
-    loadTrackedLaws();
-    initCharts();
-
-    // DataTable 초기화
-    $('#recent-updates-table').DataTable({
+    // DataTable 초기화 (데이터 로드 전)
+    updatesTable = $('#recent-updates-table').DataTable({
         "paging": true,
         "lengthChange": false,
         "searching": false,
@@ -359,12 +354,20 @@ $(document).ready(function() {
         "pageLength": 5,
         "language": {
             "info": "_START_-_END_ / _TOTAL_건",
+            "infoEmpty": "데이터 없음",
+            "emptyTable": "업데이트된 법령이 없습니다",
             "paginate": {
                 "previous": "이전",
                 "next": "다음"
             }
         }
     });
+
+    // 데이터 로드
+    loadStatistics();
+    refreshUpdates();
+    loadTrackedLaws();
+    initCharts();
 
     // 10분마다 자동 새로고침
     setInterval(() => {
