@@ -1,0 +1,438 @@
+{% extends "adminlte/base.html" %}
+
+{% block title %}통계 - 법령 추적 시스템{% endblock %}
+{% block page_title %}통계 및 분석{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="/">홈</a></li>
+<li class="breadcrumb-item active">통계</li>
+{% endblock %}
+
+{% block content %}
+<!-- 주요 통계 -->
+<div class="row">
+    <div class="col-lg-3 col-6">
+        <div class="small-box bg-info">
+            <div class="inner">
+                <h3 id="stat-total">0</h3>
+                <p>총 추적 법령</p>
+            </div>
+            <div class="icon">
+                <i class="fas fa-gavel"></i>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-3 col-6">
+        <div class="small-box bg-success">
+            <div class="inner">
+                <h3 id="stat-active">0</h3>
+                <p>활성 법령</p>
+            </div>
+            <div class="icon">
+                <i class="fas fa-check-circle"></i>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-3 col-6">
+        <div class="small-box bg-warning">
+            <div class="inner">
+                <h3 id="stat-updated" class="text-white">0</h3>
+                <p class="text-white">업데이트됨</p>
+            </div>
+            <div class="icon">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-3 col-6">
+        <div class="small-box bg-danger">
+            <div class="inner">
+                <h3 id="stat-total-changes">0</h3>
+                <p>총 변경 건수</p>
+            </div>
+            <div class="icon">
+                <i class="fas fa-edit"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 차트 행 -->
+<div class="row">
+    <!-- 카테고리별 분포 -->
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-chart-pie mr-1"></i>
+                    카테고리별 법령 분포
+                </h3>
+            </div>
+            <div class="card-body">
+                <canvas id="category-pie-chart" height="250"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- 변경 추이 -->
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-chart-line mr-1"></i>
+                    월별 변경 추이
+                </h3>
+            </div>
+            <div class="card-body">
+                <canvas id="monthly-trend-chart" height="250"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 상세 통계 테이블 -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-table mr-1"></i>
+                    법령별 상세 통계
+                </h3>
+                <div class="card-tools">
+                    <button class="btn btn-tool" onclick="exportToCSV()">
+                        <i class="fas fa-download"></i> CSV 다운로드
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <table id="stats-table" class="table table-bordered table-hover">
+                    <thead>
+                    <tr>
+                        <th>법령명</th>
+                        <th>카테고리</th>
+                        <th>변경 횟수</th>
+                        <th>마지막 확인</th>
+                        <th>공포일자</th>
+                        <th>소관부처</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 추가 분석 -->
+<div class="row">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-chart-bar mr-1"></i>
+                    소관부처별 법령 수
+                </h3>
+            </div>
+            <div class="card-body">
+                <canvas id="ministry-chart" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-trophy mr-1"></i>
+                    Top 10 자주 변경되는 법령
+                </h3>
+            </div>
+            <div class="card-body">
+                <canvas id="top-changes-chart" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let categoryPieChart = null;
+let monthlyTrendChart = null;
+let ministryChart = null;
+let topChangesChart = null;
+let statsTable = null;
+
+// 페이지 로드 시 실행
+$(document).ready(function() {
+    loadStatistics();
+    initCharts();
+
+    // DataTable 초기화
+    statsTable = $('#stats-table').DataTable({
+        "paging": true,
+        "lengthChange": true,
+        "searching": true,
+        "ordering": true,
+        "info": true,
+        "autoWidth": false,
+        "responsive": true,
+        "pageLength": 10,
+        "order": [[2, 'desc']], // 변경 횟수로 내림차순 정렬
+        "language": {
+            "lengthMenu": "_MENU_ 건씩 보기",
+            "zeroRecords": "검색 결과가 없습니다",
+            "info": "_START_-_END_ / _TOTAL_건",
+            "infoEmpty": "데이터 없음",
+            "infoFiltered": "(전체 _MAX_건 중 검색)",
+            "search": "검색:",
+            "paginate": {
+                "first": "처음",
+                "last": "마지막",
+                "next": "다음",
+                "previous": "이전"
+            }
+        }
+    });
+
+    loadTableData();
+});
+
+// 통계 로드
+function loadStatistics() {
+    fetch('/api/laws')
+        .then(response => response.json())
+        .then(data => {
+            const total = data.length;
+            const active = data.filter(law => law.변경횟수 === 0).length;
+            const updated = data.filter(law => law.변경횟수 > 0).length;
+            const totalChanges = data.reduce((sum, law) => sum + (law.변경횟수 || 0), 0);
+
+            document.getElementById('stat-total').textContent = total;
+            document.getElementById('stat-active').textContent = active;
+            document.getElementById('stat-updated').textContent = updated;
+            document.getElementById('stat-total-changes').textContent = totalChanges;
+
+            updateCharts(data);
+        })
+        .catch(err => console.error('통계 로드 실패:', err));
+}
+
+// 테이블 데이터 로드
+function loadTableData() {
+    fetch('/api/laws')
+        .then(response => response.json())
+        .then(data => {
+            // 법령 체계도에서 카테고리 정보 가져오기
+            return fetch('/api/law-hierarchy')
+                .then(res => res.json())
+                .then(hierarchyData => {
+                    const categoryMap = {};
+                    hierarchyData.nodes.forEach(node => {
+                        categoryMap[node.name] = node.category;
+                    });
+
+                    statsTable.clear();
+
+                    data.forEach(law => {
+                        const category = categoryMap[law.법령명] || '기타';
+                        statsTable.row.add([
+                            law.법령명,
+                            category,
+                            law.변경횟수 || 0,
+                            law.마지막확인 || '-',
+                            law.공포일자 || '-',
+                            law.소관부처명 || '-'
+                        ]);
+                    });
+
+                    statsTable.draw();
+                });
+        })
+        .catch(err => console.error('테이블 데이터 로드 실패:', err));
+}
+
+// 차트 초기화
+function initCharts() {
+    // 카테고리 파이 차트
+    const ctxPie = document.getElementById('category-pie-chart').getContext('2d');
+    categoryPieChart = new Chart(ctxPie, {
+        type: 'pie',
+        data: {
+            labels: [],
+            datasets: [{
+                data: [],
+                backgroundColor: [
+                    '#8B0000', '#1E90FF', '#32CD32', '#FF8C00', '#9370DB',
+                    '#DC143C', '#4682B4', '#20B2AA', '#DAA520', '#C71585'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'right'
+                }
+            }
+        }
+    });
+
+    // 월별 추이 차트
+    const ctxTrend = document.getElementById('monthly-trend-chart').getContext('2d');
+    monthlyTrendChart = new Chart(ctxTrend, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: '변경 건수',
+                data: [],
+                borderColor: 'rgb(75, 192, 192)',
+                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                tension: 0.1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+
+    // 소관부처 차트
+    const ctxMinistry = document.getElementById('ministry-chart').getContext('2d');
+    ministryChart = new Chart(ctxMinistry, {
+        type: 'bar',
+        data: {
+            labels: [],
+            datasets: [{
+                label: '법령 수',
+                data: [],
+                backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: 'y',
+            scales: {
+                x: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+
+    // Top 10 변경 차트
+    const ctxTop = document.getElementById('top-changes-chart').getContext('2d');
+    topChangesChart = new Chart(ctxTop, {
+        type: 'bar',
+        data: {
+            labels: [],
+            datasets: [{
+                label: '변경 횟수',
+                data: [],
+                backgroundColor: 'rgba(255, 99, 132, 0.5)',
+                borderColor: 'rgba(255, 99, 132, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: 'y',
+            scales: {
+                x: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+}
+
+// 차트 업데이트
+function updateCharts(laws) {
+    // 법령 체계도에서 카테고리 정보 가져오기
+    fetch('/api/law-hierarchy')
+        .then(response => response.json())
+        .then(hierarchyData => {
+            // 카테고리별 분포
+            const categories = {};
+            hierarchyData.nodes.forEach(node => {
+                categories[node.category] = (categories[node.category] || 0) + 1;
+            });
+
+            categoryPieChart.data.labels = Object.keys(categories);
+            categoryPieChart.data.datasets[0].data = Object.values(categories);
+            categoryPieChart.update();
+
+            // 소관부처별 통계
+            const ministries = {};
+            laws.forEach(law => {
+                const ministry = law.소관부처명 || '기타';
+                ministries[ministry] = (ministries[ministry] || 0) + 1;
+            });
+
+            const sortedMinistries = Object.entries(ministries)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 10);
+
+            ministryChart.data.labels = sortedMinistries.map(m => m[0]);
+            ministryChart.data.datasets[0].data = sortedMinistries.map(m => m[1]);
+            ministryChart.update();
+
+            // Top 10 변경 법령
+            const topChanges = laws
+                .filter(law => law.변경횟수 > 0)
+                .sort((a, b) => b.변경횟수 - a.변경횟수)
+                .slice(0, 10);
+
+            topChangesChart.data.labels = topChanges.map(law => law.법령명);
+            topChangesChart.data.datasets[0].data = topChanges.map(law => law.변경횟수);
+            topChangesChart.update();
+
+            // 월별 추이 (데모 데이터 - 실제로는 이력 데이터 필요)
+            const months = ['1월', '2월', '3월', '4월', '5월', '6월'];
+            const changes = [0, 0, 0, 0, 0, laws.filter(l => l.변경횟수 > 0).length];
+
+            monthlyTrendChart.data.labels = months;
+            monthlyTrendChart.data.datasets[0].data = changes;
+            monthlyTrendChart.update();
+        })
+        .catch(err => console.error('차트 업데이트 실패:', err));
+}
+
+// CSV 다운로드
+function exportToCSV() {
+    fetch('/api/laws')
+        .then(response => response.json())
+        .then(data => {
+            let csv = '법령명,변경횟수,마지막확인,공포일자,소관부처\n';
+
+            data.forEach(law => {
+                csv += `"${law.법령명}",${law.변경횟수 || 0},"${law.마지막확인 || '-'}","${law.공포일자 || '-'}","${law.소관부처명 || '-'}"\n`;
+            });
+
+            // 다운로드
+            const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `법령통계_${new Date().toISOString().split('T')[0]}.csv`;
+            link.click();
+        })
+        .catch(err => console.error('CSV 다운로드 실패:', err));
+}
+</script>
+{% endblock %}
