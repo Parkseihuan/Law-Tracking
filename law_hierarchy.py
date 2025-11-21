@@ -30,9 +30,29 @@ class LawHierarchy:
             "특별교육": {"level": 2, "color": "#20B2AA", "description": "특수·영재 교육"},
             "교육시설": {"level": 2, "color": "#DAA520", "description": "학원·도서관 등"},
             "산학협력": {"level": 2, "color": "#8B4513", "description": "산학협력·평생학습"},
-            "노동법": {"level": 2, "color": "#C71585", "description": "근로·노동 관계"},
+            "노동법": {"level": 2, "color": "#C71585", "description": "근로·노동·고용"},
+            "공무원법": {"level": 2, "color": "#FF6347", "description": "공무원 관련"},
+            "행정법": {"level": 2, "color": "#4169E1", "description": "행정·공공기관"},
+            "학술연구": {"level": 2, "color": "#8A2BE2", "description": "학술·연구"},
             "시행령/규칙": {"level": 3, "color": "#708090", "description": "하위 법령"},
             "기타": {"level": 2, "color": "#A9A9A9", "description": "기타 법령"}
+        }
+
+        # 키워드 기반 카테고리 매핑
+        self.category_keywords = {
+            "교육기본법": ["교육기본법"],
+            "학교교육": ["초중등교육", "유아교육", "고등교육", "평생교육", "대학"],
+            "교원": ["교원", "교육공무원", "교직원", "교사"],
+            "학교운영": ["사립학교", "학교법인", "국립대학"],
+            "학생보호": ["학교폭력", "학교보건", "아동", "청소년"],
+            "교육행정": ["지방교육", "교육재정", "교육자치"],
+            "특별교육": ["특수교육", "영재교육"],
+            "교육시설": ["학원", "도서관", "박물관", "미술관"],
+            "산학협력": ["산학협력", "산업교육", "학점인정", "학술진흥"],
+            "노동법": ["근로", "노동", "고용", "퇴직", "근로자", "남녀고용", "채용"],
+            "공무원법": ["공무원", "징계", "복무", "여비", "행동강령", "인사"],
+            "행정법": ["공공기관", "정보공개", "정부조직", "적극행정"],
+            "학술연구": ["학술", "연구", "박사", "명예교수"],
         }
 
         # 법령 정의 및 관계 매핑
@@ -371,15 +391,15 @@ class LawHierarchy:
         return {}
 
     def get_law_info(self, law_name: str) -> Dict:
-        """특정 법령의 정보 반환"""
-        # 완전 일치 먼저 시도
+        """특정 법령의 정보 반환 (키워드 기반 자동 분류 포함)"""
+        # 1. 완전 일치 먼저 시도
         if law_name in self.laws:
             info = self.laws[law_name].copy()
             category = info["category"]
             info["category_info"] = self.categories[category]
             return info
 
-        # 부분 일치 시도
+        # 2. 부분 일치 시도
         for full_name, law_info in self.laws.items():
             if law_name in full_name:
                 info = law_info.copy()
@@ -388,7 +408,28 @@ class LawHierarchy:
                 info["full_name"] = full_name
                 return info
 
-        # 찾지 못한 경우 기타 카테고리로 반환
+        # 3. 시행령/시행규칙 자동 분류
+        if "시행령" in law_name or "시행규칙" in law_name or "규정" in law_name or "규칙" in law_name:
+            return {
+                "category": "시행령/규칙",
+                "description": "하위 법령",
+                "related": [],
+                "category_info": self.categories["시행령/규칙"],
+                "full_name": law_name
+            }
+
+        # 4. 키워드 기반 자동 분류
+        detected_category = self._detect_category_by_keywords(law_name)
+        if detected_category:
+            return {
+                "category": detected_category,
+                "description": self.categories[detected_category]["description"],
+                "related": [],
+                "category_info": self.categories[detected_category],
+                "full_name": law_name
+            }
+
+        # 5. 찾지 못한 경우 기타 카테고리로 반환
         return {
             "category": "기타",
             "description": "미분류 법령",
@@ -396,6 +437,15 @@ class LawHierarchy:
             "category_info": {"level": 2, "color": "#A9A9A9", "description": "기타 법령"},
             "full_name": law_name
         }
+
+    def _detect_category_by_keywords(self, law_name: str) -> str:
+        """키워드 기반 카테고리 자동 감지"""
+        # 각 카테고리의 키워드와 매칭
+        for category, keywords in self.category_keywords.items():
+            for keyword in keywords:
+                if keyword in law_name:
+                    return category
+        return None
 
     def get_related_laws(self, law_name: str) -> List[str]:
         """특정 법령과 관련된 법령 목록 반환 (크롤링 데이터 우선)"""
