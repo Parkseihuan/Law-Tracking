@@ -48,73 +48,137 @@
             </div>
         </div>
 
-        <!-- 자동 확인 설정 -->
+        <!-- 스케줄 설정 (Cloud Scheduler) -->
         <div class="card">
             <div class="card-header">
                 <h3 class="card-title">
-                    <i class="fas fa-clock mr-1"></i>
-                    자동 확인 설정
+                    <i class="fas fa-calendar-alt mr-1"></i>
+                    자동 체크 스케줄
                 </h3>
             </div>
             <div class="card-body">
-                <div class="form-group">
-                    <label for="check-interval">확인 주기</label>
-                    <select class="form-control" id="check-interval">
-                        <option value="0">수동</option>
-                        <option value="3600">1시간마다</option>
-                        <option value="21600">6시간마다</option>
-                        <option value="43200">12시간마다</option>
-                        <option value="86400" selected>24시간마다</option>
-                    </select>
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i>
+                    <strong>Cloud Run 배포 시:</strong> Google Cloud Scheduler를 통해 자동으로 법령 변경사항을 체크합니다.
                 </div>
 
                 <div class="form-group">
                     <div class="custom-control custom-switch">
-                        <input type="checkbox" class="custom-control-input" id="auto-check-enabled">
-                        <label class="custom-control-label" for="auto-check-enabled">자동 확인 활성화</label>
+                        <input type="checkbox" class="custom-control-input" id="schedule-enabled">
+                        <label class="custom-control-label" for="schedule-enabled">스케줄 활성화</label>
                     </div>
+                    <small class="form-text text-muted">Cloud Run 배포 후 활성화하세요</small>
                 </div>
 
                 <div class="form-group">
-                    <label>마지막 자동 확인</label>
-                    <p class="form-control-static" id="last-auto-check">-</p>
+                    <label for="cron-expression">Cron 표현식</label>
+                    <select class="form-control" id="cron-expression" onchange="updateCronDescription()">
+                        <option value="0 */1 * * *">매 1시간마다</option>
+                        <option value="0 */6 * * *">매 6시간마다</option>
+                        <option value="0 */12 * * *">매 12시간마다</option>
+                        <option value="0 9 * * *" selected>매일 오전 9시</option>
+                        <option value="0 9,18 * * *">매일 오전 9시, 오후 6시</option>
+                        <option value="0 9 * * 1-5">평일 오전 9시</option>
+                        <option value="0 9 * * 1">매주 월요일 오전 9시</option>
+                    </select>
+                    <small class="form-text text-muted" id="cron-description">매일 오전 9시에 실행</small>
                 </div>
 
-                <button type="button" class="btn btn-success" onclick="saveAutoCheckSettings()">
-                    <i class="fas fa-save"></i> 설정 저장
+                <div class="form-group">
+                    <label for="timezone">시간대</label>
+                    <select class="form-control" id="timezone">
+                        <option value="Asia/Seoul" selected>한국 표준시 (KST)</option>
+                        <option value="UTC">협정 세계시 (UTC)</option>
+                        <option value="America/New_York">미국 동부 (EST)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>마지막 실행</label>
+                    <p class="form-control-static text-muted" id="last-run">-</p>
+                </div>
+
+                <button type="button" class="btn btn-success" onclick="saveScheduleSettings()">
+                    <i class="fas fa-save"></i> 스케줄 저장
+                </button>
+                <button type="button" class="btn btn-primary ml-2" onclick="manualCheck()">
+                    <i class="fas fa-sync"></i> 수동 체크
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- 알림 설정 -->
+    <!-- 이메일 알림 설정 -->
     <div class="col-lg-6">
         <div class="card">
             <div class="card-header">
                 <h3 class="card-title">
-                    <i class="fas fa-bell mr-1"></i>
-                    알림 설정
+                    <i class="fas fa-envelope mr-1"></i>
+                    이메일 알림 설정
                 </h3>
             </div>
             <div class="card-body">
-                <div class="form-group">
-                    <div class="custom-control custom-switch">
-                        <input type="checkbox" class="custom-control-input" id="notification-enabled" checked>
-                        <label class="custom-control-label" for="notification-enabled">법령 변경 알림</label>
-                    </div>
-                    <small class="form-text text-muted">법령이 변경되었을 때 브라우저 알림을 표시합니다</small>
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <strong>주의:</strong> Gmail 사용 시 앱 비밀번호를 생성하여 사용하세요.
+                    <a href="https://myaccount.google.com/apppasswords" target="_blank">앱 비밀번호 생성</a>
                 </div>
 
                 <div class="form-group">
                     <div class="custom-control custom-switch">
-                        <input type="checkbox" class="custom-control-input" id="sound-enabled">
-                        <label class="custom-control-label" for="sound-enabled">알림음</label>
+                        <input type="checkbox" class="custom-control-input" id="email-enabled">
+                        <label class="custom-control-label" for="email-enabled">이메일 알림 활성화</label>
                     </div>
                 </div>
 
-                <button type="button" class="btn btn-info" onclick="requestNotificationPermission()">
-                    <i class="fas fa-bell"></i> 알림 권한 요청
+                <div class="form-group">
+                    <label for="smtp-server">SMTP 서버</label>
+                    <input type="text" class="form-control" id="smtp-server" placeholder="smtp.gmail.com">
+                    <small class="form-text text-muted">Gmail: smtp.gmail.com, Naver: smtp.naver.com</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="smtp-port">SMTP 포트</label>
+                    <input type="number" class="form-control" id="smtp-port" value="587">
+                </div>
+
+                <div class="form-group">
+                    <label for="smtp-username">SMTP 사용자명 (이메일)</label>
+                    <input type="email" class="form-control" id="smtp-username" placeholder="your-email@gmail.com">
+                </div>
+
+                <div class="form-group">
+                    <label for="smtp-password">SMTP 비밀번호</label>
+                    <div class="input-group">
+                        <input type="password" class="form-control" id="smtp-password" placeholder="앱 비밀번호">
+                        <div class="input-group-append">
+                            <button class="btn btn-outline-secondary" type="button" onclick="toggleSmtpPassword()">
+                                <i class="fas fa-eye" id="smtp-eye-icon"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="email-sender">발신자 이메일</label>
+                    <input type="email" class="form-control" id="email-sender" placeholder="your-email@gmail.com">
+                    <small class="form-text text-muted">비워두면 SMTP 사용자명과 동일하게 설정됩니다</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="email-recipients">수신자 이메일 (쉼표로 구분)</label>
+                    <input type="text" class="form-control" id="email-recipients"
+                           placeholder="email1@example.com, email2@example.com">
+                </div>
+
+                <button type="button" class="btn btn-success" onclick="saveEmailSettings()">
+                    <i class="fas fa-save"></i> 이메일 설정 저장
                 </button>
+                <button type="button" class="btn btn-info ml-2" onclick="testEmailConnection()">
+                    <i class="fas fa-vial"></i> 연결 테스트
+                </button>
+
+                <div id="email-test-result" class="mt-3" style="display:none;"></div>
             </div>
         </div>
 
@@ -204,17 +268,8 @@ $(document).ready(function() {
     checkApiStatus();
     loadDataStats();
     loadSystemInfo();
-
-    // 설정 불러오기
-    const autoCheckEnabled = localStorage.getItem('autoCheckEnabled') === 'true';
-    const checkInterval = localStorage.getItem('checkInterval') || '86400';
-    const notificationEnabled = localStorage.getItem('notificationEnabled') !== 'false';
-    const soundEnabled = localStorage.getItem('soundEnabled') === 'true';
-
-    document.getElementById('auto-check-enabled').checked = autoCheckEnabled;
-    document.getElementById('check-interval').value = checkInterval;
-    document.getElementById('notification-enabled').checked = notificationEnabled;
-    document.getElementById('sound-enabled').checked = soundEnabled;
+    loadScheduleSettings();
+    loadEmailSettings();
 });
 
 // API 키 토글
@@ -278,34 +333,204 @@ function testApiConnection() {
         });
 }
 
-// 자동 확인 설정 저장
-function saveAutoCheckSettings() {
-    const enabled = document.getElementById('auto-check-enabled').checked;
-    const interval = document.getElementById('check-interval').value;
+// ==================== 스케줄 설정 ====================
 
-    localStorage.setItem('autoCheckEnabled', enabled);
-    localStorage.setItem('checkInterval', interval);
+// 스케줄 설정 로드
+function loadScheduleSettings() {
+    fetch('/api/config/schedule')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('schedule-enabled').checked = data.enabled || false;
+            document.getElementById('cron-expression').value = data.cron || '0 9 * * *';
+            document.getElementById('timezone').value = data.timezone || 'Asia/Seoul';
 
-    alert('설정이 저장되었습니다!');
+            if (data.last_run) {
+                const lastRun = new Date(data.last_run);
+                document.getElementById('last-run').textContent =
+                    lastRun.toLocaleString('ko-KR', {timeZone: 'Asia/Seoul'});
+            }
+
+            updateCronDescription();
+        })
+        .catch(err => console.error('스케줄 설정 로드 실패:', err));
 }
 
-// 알림 권한 요청
-function requestNotificationPermission() {
-    if ('Notification' in window) {
-        Notification.requestPermission().then(permission => {
-            if (permission === 'granted') {
-                new Notification('법령 추적 시스템', {
-                    body: '알림이 활성화되었습니다!',
-                    icon: '/static/favicon.ico'
-                });
-                alert('알림 권한이 허용되었습니다.');
-            } else {
-                alert('알림 권한이 거부되었습니다.');
-            }
-        });
-    } else {
-        alert('이 브라우저는 알림을 지원하지 않습니다.');
+// Cron 설명 업데이트
+function updateCronDescription() {
+    const cron = document.getElementById('cron-expression').value;
+    const descriptions = {
+        '0 */1 * * *': '매 1시간마다 실행',
+        '0 */6 * * *': '매 6시간마다 실행',
+        '0 */12 * * *': '매 12시간마다 실행',
+        '0 9 * * *': '매일 오전 9시에 실행',
+        '0 9,18 * * *': '매일 오전 9시, 오후 6시에 실행',
+        '0 9 * * 1-5': '평일 오전 9시에 실행',
+        '0 9 * * 1': '매주 월요일 오전 9시에 실행'
+    };
+    document.getElementById('cron-description').textContent =
+        descriptions[cron] || 'Cron 표현식: ' + cron;
+}
+
+// 스케줄 설정 저장
+function saveScheduleSettings() {
+    const scheduleData = {
+        enabled: document.getElementById('schedule-enabled').checked,
+        cron: document.getElementById('cron-expression').value,
+        timezone: document.getElementById('timezone').value
+    };
+
+    fetch('/api/config/schedule', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(scheduleData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('✅ 스케줄 설정이 저장되었습니다!\n\nCloud Run 배포 시 Google Cloud Scheduler를 설정해야 합니다.');
+            loadScheduleSettings();
+        } else {
+            alert('❌ 저장 실패: ' + data.message);
+        }
+    })
+    .catch(err => {
+        console.error('스케줄 저장 실패:', err);
+        alert('❌ 저장 중 오류가 발생했습니다.');
+    });
+}
+
+// 수동 체크 실행
+function manualCheck() {
+    if (!confirm('수동으로 법령 변경사항을 체크하시겠습니까?')) {
+        return;
     }
+
+    const btn = event.target;
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 체크 중...';
+
+    fetch('/api/check-updates', {method: 'POST'})
+        .then(response => response.json())
+        .then(data => {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+
+            if (data.success) {
+                let message = `✅ 체크 완료!\n\n변경사항: ${data.updated}건`;
+                if (data.notifications) {
+                    if (data.notifications.email) {
+                        message += '\n📧 이메일 알림 발송 완료';
+                    }
+                }
+                alert(message);
+                loadScheduleSettings();
+            } else {
+                alert('❌ 체크 실패: ' + data.error);
+            }
+        })
+        .catch(err => {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+            console.error('체크 실패:', err);
+            alert('❌ 체크 중 오류가 발생했습니다.');
+        });
+}
+
+// ==================== 이메일 설정 ====================
+
+// 이메일 설정 로드
+function loadEmailSettings() {
+    fetch('/api/config/email')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('email-enabled').checked = data.enabled || false;
+            document.getElementById('smtp-server').value = data.smtp_server || '';
+            document.getElementById('smtp-port').value = data.smtp_port || 587;
+            document.getElementById('smtp-username').value = data.smtp_username || '';
+            document.getElementById('smtp-password').value = data.smtp_password || '';
+            document.getElementById('email-sender').value = data.sender || '';
+
+            if (data.recipients && Array.isArray(data.recipients)) {
+                document.getElementById('email-recipients').value = data.recipients.join(', ');
+            }
+        })
+        .catch(err => console.error('이메일 설정 로드 실패:', err));
+}
+
+// SMTP 비밀번호 토글
+function toggleSmtpPassword() {
+    const input = document.getElementById('smtp-password');
+    const icon = document.getElementById('smtp-eye-icon');
+
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+    } else {
+        input.type = 'password';
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
+    }
+}
+
+// 이메일 설정 저장
+function saveEmailSettings() {
+    const recipientsText = document.getElementById('email-recipients').value;
+    const recipients = recipientsText.split(',').map(email => email.trim()).filter(email => email);
+
+    const emailData = {
+        enabled: document.getElementById('email-enabled').checked,
+        smtp_server: document.getElementById('smtp-server').value,
+        smtp_port: parseInt(document.getElementById('smtp-port').value),
+        smtp_username: document.getElementById('smtp-username').value,
+        smtp_password: document.getElementById('smtp-password').value,
+        sender: document.getElementById('email-sender').value,
+        recipients: recipients
+    };
+
+    fetch('/api/config/email', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(emailData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('✅ 이메일 설정이 저장되었습니다!');
+            loadEmailSettings();
+        } else {
+            alert('❌ 저장 실패: ' + data.message);
+        }
+    })
+    .catch(err => {
+        console.error('이메일 저장 실패:', err);
+        alert('❌ 저장 중 오류가 발생했습니다.');
+    });
+}
+
+// 이메일 연결 테스트
+function testEmailConnection() {
+    const resultDiv = document.getElementById('email-test-result');
+    resultDiv.style.display = 'block';
+    resultDiv.className = 'alert alert-info mt-3';
+    resultDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> SMTP 서버 연결 테스트 중...';
+
+    fetch('/api/config/email/test', {method: 'POST'})
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                resultDiv.className = 'alert alert-success mt-3';
+                resultDiv.innerHTML = '<i class="fas fa-check-circle"></i> ' + data.message;
+            } else {
+                resultDiv.className = 'alert alert-danger mt-3';
+                resultDiv.innerHTML = '<i class="fas fa-times-circle"></i> ' + data.message;
+            }
+        })
+        .catch(err => {
+            resultDiv.className = 'alert alert-danger mt-3';
+            resultDiv.innerHTML = '<i class="fas fa-times-circle"></i> 테스트 중 오류 발생: ' + err.message;
+        });
 }
 
 // 데이터 통계 로드

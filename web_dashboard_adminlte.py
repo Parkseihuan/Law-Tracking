@@ -10,6 +10,8 @@ from pathlib import Path
 from datetime import datetime
 from law_tracker import LawTracker
 from law_hierarchy import LawHierarchy
+from config_manager import ConfigManager
+from notification_service import NotificationService
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -21,6 +23,8 @@ app.config['JSON_AS_ASCII'] = False  # 한글 지원
 api_key = os.getenv('LAW_API_KEY')
 tracker = LawTracker(api_key) if api_key else None
 hierarchy = LawHierarchy()
+config_manager = ConfigManager()
+notification_service = NotificationService(config_manager)
 
 
 # ==================== 페이지 라우트 ====================
@@ -169,16 +173,26 @@ def get_statistics():
 
 @app.route('/api/check-updates', methods=['POST'])
 def check_updates():
-    """변경사항 확인"""
+    """변경사항 확인 (알림 포함)"""
     if not tracker:
         return jsonify({"success": False, "error": "API 키가 설정되지 않았습니다"}), 500
 
     try:
         updates = tracker.check_updates()
+
+        # 마지막 실행 시간 업데이트
+        config_manager.update_last_run()
+
+        # 변경사항이 있으면 알림 발송
+        notification_results = {}
+        if updates:
+            notification_results = notification_service.notify_changes(updates)
+
         return jsonify({
             "success": True,
             "updated": len(updates),
-            "changes": updates
+            "changes": updates,
+            "notifications": notification_results
         })
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
@@ -248,6 +262,151 @@ def get_law_hierarchy():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+# ==================== 설정 관련 API ====================
+
+@app.route('/api/config')
+def get_config():
+    """전체 설정 조회"""
+    try:
+        config = config_manager.get_all_config()
+        # 비밀번호 마스킹
+        if 'notifications' in config and 'email' in config['notifications']:
+            if config['notifications']['email'].get('smtp_password'):
+                config['notifications']['email']['smtp_password'] = '********'
+        return jsonify(config)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/config/schedule', methods=['GET', 'POST'])
+def manage_schedule_config():
+    """스케줄 설정 조회/저장"""
+    if request.method == 'GET':
+        try:
+            schedule = config_manager.get_schedule_config()
+            return jsonify(schedule)
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    elif request.method == 'POST':
+        try:
+            data = request.get_json()
+            success = config_manager.update_schedule_config(
+                enabled=data.get('enabled'),
+                cron=data.get('cron'),
+                timezone=data.get('timezone')
+            )
+            if success:
+                return jsonify({
+                    "success": True,
+                    "message": "스케줄 설정이 저장되었습니다",
+                    "config": config_manager.get_schedule_config()
+                })
+            else:
+                return jsonify({"success": False, "message": "저장 실패"}), 500
+        except Exception as e:
+            return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/config/email', methods=['GET', 'POST'])
+def manage_email_config():
+    """이메일 설정 조회/저장"""
+    if request.method == 'GET':
+        try:
+            email = config_manager.get_email_config()
+            # 비밀번호 마스킹
+            if email.get('smtp_password'):
+                email['smtp_password'] = '********'
+            return jsonify(email)
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    elif request.method == 'POST':
+        try:
+            data = request.get_json()
+
+            # 비밀번호가 마스킹된 경우 기존 값 유지
+            smtp_password = data.get('smtp_password')
+            if smtp_password == '********':
+                smtp_password = config_manager.get('notifications.email.smtp_password')
+
+            success = config_manager.update_email_config(
+                enabled=data.get('enabled'),
+                recipients=data.get('recipients'),
+                smtp_server=data.get('smtp_server'),
+                smtp_port=data.get('smtp_port'),
+                smtp_username=data.get('smtp_username'),
+                smtp_password=smtp_password,
+                sender=data.get('sender')
+            )
+
+            if success:
+                email = config_manager.get_email_config()
+                if email.get('smtp_password'):
+                    email['smtp_password'] = '********'
+                return jsonify({
+                    "success": True,
+                    "message": "이메일 설정이 저장되었습니다",
+                    "config": email
+                })
+            else:
+                return jsonify({"success": False, "message": "저장 실패"}), 500
+        except Exception as e:
+            return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/config/email/test', methods=['POST'])
+def test_email_config():
+    """이메일 연결 테스트"""
+    try:
+        result = notification_service.test_email_connection()
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@app.route('/api/scheduled-check', methods=['POST'])
+def scheduled_check():
+    """스케줄된 자동 체크 (Cloud Scheduler에서 호출)"""
+    # Cloud Scheduler 인증 확인 (선택사항)
+    # auth_header = request.headers.get('Authorization', '')
+    # if not auth_header:
+    #     return jsonify({"error": "Unauthorized"}), 401
+
+    if not tracker:
+        return jsonify({"success": False, "error": "트래커가 초기화되지 않았습니다"}), 500
+
+    try:
+        # 스케줄이 활성화되어 있는지 확인
+        if not config_manager.get('schedule.enabled'):
+            return jsonify({
+                "success": False,
+                "error": "스케줄이 비활성화되어 있습니다"
+            }), 400
+
+        # 변경사항 체크
+        updates = tracker.check_updates()
+
+        # 마지막 실행 시간 업데이트
+        config_manager.update_last_run()
+
+        # 알림 발송
+        notification_results = {}
+        if updates:
+            notification_results = notification_service.notify_changes(updates)
+
+        return jsonify({
+            "success": True,
+            "timestamp": datetime.now().isoformat(),
+            "updated": len(updates),
+            "changes": updates,
+            "notifications": notification_results
+        })
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 if __name__ == "__main__":
