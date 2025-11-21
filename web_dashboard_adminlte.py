@@ -56,6 +56,12 @@ def statistics_page():
     return render_template('adminlte/statistics.html')
 
 
+@app.route('/settings')
+def settings_page():
+    """시스템 설정 페이지"""
+    return render_template('adminlte/settings.html')
+
+
 # ==================== API 엔드포인트 ====================
 
 @app.route('/api/laws')

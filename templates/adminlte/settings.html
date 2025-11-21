@@ -1,0 +1,375 @@
+{% extends "adminlte/base.html" %}
+
+{% block title %}시스템 설정 - 법령 추적 시스템{% endblock %}
+{% block page_title %}시스템 설정{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="/">홈</a></li>
+<li class="breadcrumb-item active">시스템 설정</li>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- API 설정 -->
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-key mr-1"></i>
+                    API 설정
+                </h3>
+            </div>
+            <div class="card-body">
+                <form id="api-form">
+                    <div class="form-group">
+                        <label for="api-key">API 키</label>
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="api-key" value="psh@yi.ac.kr" readonly>
+                            <div class="input-group-append">
+                                <button class="btn btn-outline-secondary" type="button" onclick="toggleApiKey()">
+                                    <i class="fas fa-eye" id="eye-icon"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <small class="form-text text-muted">국가법령정보센터 Open API 키 (.env 파일에서 설정)</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>API 상태</label>
+                        <div id="api-status" class="alert alert-info">
+                            <i class="fas fa-spinner fa-spin"></i> API 연결 확인 중...
+                        </div>
+                    </div>
+
+                    <button type="button" class="btn btn-primary" onclick="testApiConnection()">
+                        <i class="fas fa-vial"></i> API 연결 테스트
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- 자동 확인 설정 -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-clock mr-1"></i>
+                    자동 확인 설정
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="form-group">
+                    <label for="check-interval">확인 주기</label>
+                    <select class="form-control" id="check-interval">
+                        <option value="0">수동</option>
+                        <option value="3600">1시간마다</option>
+                        <option value="21600">6시간마다</option>
+                        <option value="43200">12시간마다</option>
+                        <option value="86400" selected>24시간마다</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <div class="custom-control custom-switch">
+                        <input type="checkbox" class="custom-control-input" id="auto-check-enabled">
+                        <label class="custom-control-label" for="auto-check-enabled">자동 확인 활성화</label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>마지막 자동 확인</label>
+                    <p class="form-control-static" id="last-auto-check">-</p>
+                </div>
+
+                <button type="button" class="btn btn-success" onclick="saveAutoCheckSettings()">
+                    <i class="fas fa-save"></i> 설정 저장
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 알림 설정 -->
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-bell mr-1"></i>
+                    알림 설정
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="form-group">
+                    <div class="custom-control custom-switch">
+                        <input type="checkbox" class="custom-control-input" id="notification-enabled" checked>
+                        <label class="custom-control-label" for="notification-enabled">법령 변경 알림</label>
+                    </div>
+                    <small class="form-text text-muted">법령이 변경되었을 때 브라우저 알림을 표시합니다</small>
+                </div>
+
+                <div class="form-group">
+                    <div class="custom-control custom-switch">
+                        <input type="checkbox" class="custom-control-input" id="sound-enabled">
+                        <label class="custom-control-label" for="sound-enabled">알림음</label>
+                    </div>
+                </div>
+
+                <button type="button" class="btn btn-info" onclick="requestNotificationPermission()">
+                    <i class="fas fa-bell"></i> 알림 권한 요청
+                </button>
+            </div>
+        </div>
+
+        <!-- 데이터 관리 -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-database mr-1"></i>
+                    데이터 관리
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <div class="info-box">
+                            <span class="info-box-icon bg-info"><i class="fas fa-gavel"></i></span>
+                            <div class="info-box-content">
+                                <span class="info-box-text">추적 중인 법령</span>
+                                <span class="info-box-number" id="total-laws">0</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="info-box">
+                            <span class="info-box-icon bg-warning"><i class="fas fa-history"></i></span>
+                            <div class="info-box-content">
+                                <span class="info-box-text">이력 파일</span>
+                                <span class="info-box-number" id="history-files">0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="btn-group-vertical btn-block" role="group">
+                    <button type="button" class="btn btn-success" onclick="exportData()">
+                        <i class="fas fa-download"></i> 데이터 내보내기 (JSON)
+                    </button>
+                    <button type="button" class="btn btn-warning" onclick="clearCache()">
+                        <i class="fas fa-trash"></i> 캐시 삭제
+                    </button>
+                    <button type="button" class="btn btn-danger" onclick="confirmClearAllData()">
+                        <i class="fas fa-exclamation-triangle"></i> 모든 데이터 삭제
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 시스템 정보 -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    시스템 정보
+                </h3>
+            </div>
+            <div class="card-body">
+                <dl class="row">
+                    <dt class="col-sm-4">버전</dt>
+                    <dd class="col-sm-8">1.0.0</dd>
+
+                    <dt class="col-sm-4">프레임워크</dt>
+                    <dd class="col-sm-8">Flask + AdminLTE</dd>
+
+                    <dt class="col-sm-4">API 제공</dt>
+                    <dd class="col-sm-8">국가법령정보센터</dd>
+
+                    <dt class="col-sm-4">브라우저</dt>
+                    <dd class="col-sm-8" id="browser-info">-</dd>
+
+                    <dt class="col-sm-4">화면 해상도</dt>
+                    <dd class="col-sm-8" id="screen-info">-</dd>
+                </dl>
+
+                <a href="https://github.com/YOUR_USERNAME/Law-Tracking" target="_blank" class="btn btn-dark btn-block">
+                    <i class="fab fa-github"></i> GitHub 저장소
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// 페이지 로드 시 실행
+$(document).ready(function() {
+    checkApiStatus();
+    loadDataStats();
+    loadSystemInfo();
+
+    // 설정 불러오기
+    const autoCheckEnabled = localStorage.getItem('autoCheckEnabled') === 'true';
+    const checkInterval = localStorage.getItem('checkInterval') || '86400';
+    const notificationEnabled = localStorage.getItem('notificationEnabled') !== 'false';
+    const soundEnabled = localStorage.getItem('soundEnabled') === 'true';
+
+    document.getElementById('auto-check-enabled').checked = autoCheckEnabled;
+    document.getElementById('check-interval').value = checkInterval;
+    document.getElementById('notification-enabled').checked = notificationEnabled;
+    document.getElementById('sound-enabled').checked = soundEnabled;
+});
+
+// API 키 토글
+function toggleApiKey() {
+    const input = document.getElementById('api-key');
+    const icon = document.getElementById('eye-icon');
+
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+    } else {
+        input.type = 'password';
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
+    }
+}
+
+// API 상태 확인
+function checkApiStatus() {
+    fetch('/api/statistics')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('api-status').innerHTML = `
+                <i class="fas fa-check-circle text-success"></i>
+                <strong>API 연결 정상</strong><br>
+                <small>추적 중인 법령: ${data.total_laws}개</small>
+            `;
+        })
+        .catch(err => {
+            document.getElementById('api-status').innerHTML = `
+                <i class="fas fa-times-circle text-danger"></i>
+                <strong>API 연결 실패</strong><br>
+                <small>${err.message}</small>
+            `;
+        });
+}
+
+// API 연결 테스트
+function testApiConnection() {
+    const statusDiv = document.getElementById('api-status');
+    statusDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 테스트 중...';
+
+    fetch('/api/statistics')
+        .then(response => response.json())
+        .then(data => {
+            statusDiv.className = 'alert alert-success';
+            statusDiv.innerHTML = `
+                <i class="fas fa-check-circle"></i>
+                <strong>API 연결 성공!</strong><br>
+                <small>추적 중인 법령: ${data.total_laws}개</small>
+            `;
+        })
+        .catch(err => {
+            statusDiv.className = 'alert alert-danger';
+            statusDiv.innerHTML = `
+                <i class="fas fa-times-circle"></i>
+                <strong>연결 실패</strong><br>
+                <small>${err.message}</small>
+            `;
+        });
+}
+
+// 자동 확인 설정 저장
+function saveAutoCheckSettings() {
+    const enabled = document.getElementById('auto-check-enabled').checked;
+    const interval = document.getElementById('check-interval').value;
+
+    localStorage.setItem('autoCheckEnabled', enabled);
+    localStorage.setItem('checkInterval', interval);
+
+    alert('설정이 저장되었습니다!');
+}
+
+// 알림 권한 요청
+function requestNotificationPermission() {
+    if ('Notification' in window) {
+        Notification.requestPermission().then(permission => {
+            if (permission === 'granted') {
+                new Notification('법령 추적 시스템', {
+                    body: '알림이 활성화되었습니다!',
+                    icon: '/static/favicon.ico'
+                });
+                alert('알림 권한이 허용되었습니다.');
+            } else {
+                alert('알림 권한이 거부되었습니다.');
+            }
+        });
+    } else {
+        alert('이 브라우저는 알림을 지원하지 않습니다.');
+    }
+}
+
+// 데이터 통계 로드
+function loadDataStats() {
+    fetch('/api/statistics')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('total-laws').textContent = data.total_laws || 0;
+            // 이력 파일 수는 별도 API 필요
+            document.getElementById('history-files').textContent = '0';
+        })
+        .catch(err => console.error('통계 로드 실패:', err));
+}
+
+// 시스템 정보 로드
+function loadSystemInfo() {
+    // 브라우저 정보
+    const browser = navigator.userAgent.match(/(firefox|msie|chrome|safari)[\/\s]([\d.]+)/gi);
+    document.getElementById('browser-info').textContent = browser ? browser[0] : 'Unknown';
+
+    // 화면 해상도
+    document.getElementById('screen-info').textContent =
+        `${window.screen.width} × ${window.screen.height}`;
+}
+
+// 데이터 내보내기
+function exportData() {
+    fetch('/api/laws')
+        .then(response => response.json())
+        .then(data => {
+            const json = JSON.stringify(data, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `law_tracking_backup_${new Date().toISOString().split('T')[0]}.json`;
+            link.click();
+
+            alert('데이터가 내보내기되었습니다!');
+        })
+        .catch(err => {
+            console.error('내보내기 실패:', err);
+            alert('데이터 내보내기에 실패했습니다.');
+        });
+}
+
+// 캐시 삭제
+function clearCache() {
+    if (confirm('캐시를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
+        // 로컬 스토리지 캐시 삭제
+        localStorage.removeItem('cachedLaws');
+        localStorage.removeItem('cachedStats');
+
+        alert('캐시가 삭제되었습니다!');
+        location.reload();
+    }
+}
+
+// 모든 데이터 삭제 확인
+function confirmClearAllData() {
+    if (confirm('⚠️ 경고: 모든 추적 데이터가 삭제됩니다!\n\n정말로 삭제하시겠습니까?')) {
+        if (confirm('정말 확실합니까? 이 작업은 되돌릴 수 없습니다!')) {
+            alert('이 기능은 서버 측 구현이 필요합니다.\n현재는 수동으로 data/ 폴더를 삭제해주세요.');
+        }
+    }
+}
+</script>
+{% endblock %}
