@@ -11,10 +11,7 @@ from typing import List, Dict, Optional
 from pathlib import Path
 import requests
 from dotenv import load_dotenv
-from xml.etree import ElementTree as ET
-
-load_dotenv()
-
+from comparison_generator import LawComparisonGenerator
 
 class LawTracker:
     """법령 추적 클래스"""
@@ -29,10 +26,14 @@ class LawTracker:
         (self.data_dir / "cache").mkdir(exist_ok=True)
         (self.data_dir / "history").mkdir(exist_ok=True)
         (self.data_dir / "snapshots").mkdir(exist_ok=True)
+        (self.data_dir / "diffs").mkdir(exist_ok=True)
 
         # 추적 대상 법령 목록
         self.tracked_laws_file = self.data_dir / "tracked_laws.json"
         self.tracked_laws = self._load_tracked_laws()
+        
+        # 비교 생성기 초기화
+        self.comparator = LawComparisonGenerator()
 
     def _load_tracked_laws(self) -> Dict:
         """추적 대상 법령 목록 로드"""
@@ -197,6 +198,62 @@ class LawTracker:
 
         return filename
 
+    def _get_latest_snapshot(self, law_name: str) -> Optional[Dict]:
+        """가장 최근 스냅샷 로드"""
+        snapshots = sorted(list((self.data_dir / "snapshots").glob(f"{law_name}_*.json")), reverse=True)
+        if snapshots:
+            try:
+                with open(snapshots[0], 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except Exception as e:
+                print(f"❌ 스냅샷 로드 실패: {e}")
+        return None
+
+    def _extract_law_content(self, detail: Dict) -> str:
+        """법령 상세 정보에서 조문 내용 추출"""
+        content = []
+        
+        # 기본 정보
+        if '기본정보' in detail:
+            info = detail['기본정보']
+            content.append(f"법령명: {info.get('법령명_한글', '')}")
+            content.append(f"공포일자: {info.get('공포일자', '')}")
+            content.append(f"시행일자: {info.get('시행일자', '')}")
+            content.append("")
+
+        # 조문 내용
+        if '조문' in detail:
+            articles = detail['조문']
+            if isinstance(articles, dict): # 단일 조문
+                articles = [articles]
+            
+            if isinstance(articles, list):
+                for article in articles:
+                    if '조문단위' in article: # 조문단위가 있는 경우 (조, 항, 호 등)
+                        # 조문 내용 구성
+                        article_text = f"{article.get('조문번호', '')} {article.get('조문제목', '')}".strip()
+                        if '조문내용' in article:
+                            article_text += f"\n{article['조문내용']}"
+                        content.append(article_text)
+                        
+                        # 항 처리
+                        if '항' in article:
+                            hangs = article['항']
+                            if isinstance(hangs, dict): hangs = [hangs]
+                            for hang in hangs:
+                                if '항내용' in hang:
+                                    content.append(f"  {hang['항내용']}")
+                                    
+                                    # 호 처리
+                                    if '호' in hang:
+                                        hos = hang['호']
+                                        if isinstance(hos, dict): hos = [hos]
+                                        for ho in hos:
+                                            if '호내용' in ho:
+                                                content.append(f"    {ho['호내용']}")
+        
+        return "\n".join(content)
+
     def check_updates(self) -> List[Dict]:
         """모든 추적 대상 법령의 업데이트 확인"""
         updates = []
@@ -228,20 +285,46 @@ class LawTracker:
                 print(f"   새 공포일자: {current_pub_date}")
                 print(f"   새 법령일련번호: {current_mst_seq}")
 
+                diff_file = None
+                
+                # 이전 스냅샷 로드 및 비교
+                prev_snapshot = self._get_latest_snapshot(law_name)
+                
                 # 상세 정보 조회 및 저장
                 detail = self.get_law_detail(current_mst_seq)
                 if detail:
                     snapshot_file = self._save_snapshot(law_name, current_mst_seq, detail)
                     print(f"   💾 스냅샷 저장: {snapshot_file.name}")
+                    
+                    # 신구대조표 생성
+                    if prev_snapshot and '상세정보' in prev_snapshot:
+                        try:
+                            old_content = self._extract_law_content(prev_snapshot['상세정보'])
+                            new_content = self._extract_law_content(detail)
+                            
+                            # HTML 비교 생성
+                            diff_path = self.data_dir / "diffs" / f"{law_name}_{current_pub_date}_diff.html"
+                            self.comparator.generate_side_by_side_comparison(
+                                old_content, 
+                                new_content, 
+                                law_name, 
+                                str(diff_path)
+                            )
+                            diff_file = diff_path.name
+                            print(f"   📊 신구대조표 생성: {diff_file}")
+                        except Exception as e:
+                            print(f"   ⚠️ 신구대조표 생성 실패: {e}")
 
-                updates.append({
+                update_record = {
                     "법령명": law_name,
                     "이전공포일자": info['마지막공포일자'],
                     "현재공포일자": current_pub_date,
                     "이전법령일련번호": info['법령일련번호'],
                     "현재법령일련번호": current_mst_seq,
-                    "확인일시": datetime.now().isoformat()
-                })
+                    "확인일시": datetime.now().isoformat(),
+                    "신구대조표": diff_file
+                }
+                updates.append(update_record)
 
                 # 정보 업데이트
                 info['법령일련번호'] = current_mst_seq
@@ -249,6 +332,20 @@ class LawTracker:
                 info['공포일자'] = current_pub_date
                 info['시행일자'] = current_law.get('시행일자')
                 info['변경횟수'] = info.get('변경횟수', 0) + 1
+                
+                # 변경 내역에 추가
+                if '변경내역' not in info:
+                    info['변경내역'] = []
+                
+                info['변경내역'].insert(0, {
+                    "확인시각": datetime.now().isoformat(),
+                    "변경내용": f"공포일자 변경 ({info['마지막공포일자']} -> {current_pub_date})",
+                    "신구대조표": diff_file
+                })
+                
+                # 변경내역 최대 10개 유지
+                if len(info['변경내역']) > 10:
+                    info['변경내역'] = info['변경내역'][:10]
 
             else:
                 print(f"   ✅ 변경 없음")

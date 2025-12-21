@@ -264,6 +264,30 @@ def get_law_hierarchy():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/law-diff')
+def get_law_diff():
+    """신구대조표 HTML 반환"""
+    filename = request.args.get('filename')
+    if not filename:
+        return "파일명이 필요합니다", 400
+    
+    # 보안: 파일명에 경로 탐색 문자 포함 여부 확인
+    if '..' in filename or '/' in filename or '\\' in filename:
+        return "잘못된 파일명입니다", 400
+        
+    diff_dir = Path("data/diffs")
+    file_path = diff_dir / filename
+    
+    if not file_path.exists():
+        return "파일을 찾을 수 없습니다", 404
+        
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            return f.read()
+    except Exception as e:
+        return str(e), 500
+
+
 # ==================== 설정 관련 API ====================
 
 @app.route('/api/config')
@@ -414,15 +438,15 @@ if __name__ == "__main__":
         print("❌ API 키가 설정되지 않았습니다. .env 파일을 확인해주세요.")
     else:
         print("="*80)
-        print("🌐 법령 추적 웹 대시보드 (AdminLTE)")
+        print("WEB DASHBOARD (AdminLTE)")
         print("="*80)
-        print(f"\n🚀 서버 시작: http://localhost:5000")
-        print("📌 브라우저에서 위 주소로 접속하세요\n")
-        print("💡 AdminLTE 템플릿 적용")
-        print("   - 대시보드: http://localhost:5000/")
-        print("   - 법령 목록: http://localhost:5000/laws")
-        print("   - 법령 체계도: http://localhost:5000/hierarchy")
-        print("\n종료하려면 Ctrl+C를 누르세요")
+        print(f"\nSERVER START: http://localhost:5000")
+        print("Please access the above URL in your browser\n")
+        print("AdminLTE Template Applied")
+        print("   - Dashboard: http://localhost:5000/")
+        print("   - Laws List: http://localhost:5000/laws")
+        print("   - Hierarchy: http://localhost:5000/hierarchy")
+        print("\nPress Ctrl+C to exit")
         print("="*80 + "\n")
 
         app.run(debug=True, host='0.0.0.0', port=5000)

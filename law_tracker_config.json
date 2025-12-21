@@ -1,0 +1,46 @@
+{
+  "schedule": {
+    "enabled": false,
+    "cron": "0 9 * * *",
+    "timezone": "Asia/Seoul",
+    "last_run": "2025-12-04T11:33:00.228907"
+  },
+  "notifications": {
+    "discord": {
+      "enabled": false,
+      "webhook_url": ""
+    },
+    "telegram": {
+      "enabled": false,
+      "bot_token": "",
+      "chat_id": ""
+    },
+    "slack": {
+      "enabled": false,
+      "webhook_url": ""
+    },
+    "email": {
+      "enabled": false,
+      "recipients": [
+        "psh@yi.ac.kr"
+      ],
+      "smtp_server": "smtp.gmail.com",
+      "smtp_port": 587,
+      "smtp_username": "psh@yi.ac.kr",
+      "smtp_password": "axptenvnnhmpvmct",
+      "sender": "psh@yi.ac.kr"
+    },
+    "webhook": {
+      "enabled": false,
+      "url": ""
+    }
+  },
+  "api": {
+    "key": "psh@yi.ac.kr",
+    "base_url": "https://www.law.go.kr/DRF/lawSearch.do"
+  },
+  "tracking": {
+    "auto_add_related": false,
+    "max_depth": 2
+  }
+}

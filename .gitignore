@@ -41,5 +41,4 @@ Thumbs.db
 
 # Project specific
 *.log
-data/
 cache/
