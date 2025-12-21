@@ -1,0 +1,12 @@
+version: 1
+services:
+  - type: web
+    name: law-tracking
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn web_dashboard_adminlte:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: LAW_API_KEY
+        sync: false
