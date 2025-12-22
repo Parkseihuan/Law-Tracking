@@ -12,21 +12,36 @@ from pathlib import Path
 import requests
 from dotenv import load_dotenv
 from comparison_generator import LawComparisonGenerator
+from db_manager import DatabaseManager
 
 class LawTracker:
     """법령 추적 클래스"""
 
-    def __init__(self, api_key: str, data_dir: str = "data"):
+    def __init__(self, api_key: str, data_dir: str = "data", use_mongodb: bool = True):
         self.api_key = api_key
         self.base_url = "http://www.law.go.kr/DRF"
         self.data_dir = Path(data_dir)
 
-        # 디렉토리 생성
+        # 디렉토리 생성 (fallback용)
         self.data_dir.mkdir(exist_ok=True)
         (self.data_dir / "cache").mkdir(exist_ok=True)
         (self.data_dir / "history").mkdir(exist_ok=True)
         (self.data_dir / "snapshots").mkdir(exist_ok=True)
         (self.data_dir / "diffs").mkdir(exist_ok=True)
+
+        # MongoDB 초기화
+        self.db = None
+        if use_mongodb:
+            try:
+                self.db = DatabaseManager()
+                if self.db.is_connected():
+                    print("✅ Using MongoDB for data storage")
+                else:
+                    print("⚠️ MongoDB not available, using local file storage")
+                    self.db = None
+            except Exception as e:
+                print(f"⚠️ MongoDB initialization failed: {e}, using local file storage")
+                self.db = None
 
         # 추적 대상 법령 목록
         self.tracked_laws_file = self.data_dir / "tracked_laws.json"
@@ -36,16 +51,25 @@ class LawTracker:
         self.comparator = LawComparisonGenerator()
 
     def _load_tracked_laws(self) -> Dict:
-        """추적 대상 법령 목록 로드"""
+        """추적 대상 법령 목록 로드 (MongoDB 우선, fallback to file)"""
+        if self.db and self.db.is_connected():
+            return self.db.get_all_tracked_laws()
+        
+        # Fallback to local file
         if self.tracked_laws_file.exists():
             with open(self.tracked_laws_file, 'r', encoding='utf-8') as f:
                 return json.load(f)
         return {}
 
     def _save_tracked_laws(self):
-        """추적 대상 법령 목록 저장"""
-        with open(self.tracked_laws_file, 'w', encoding='utf-8') as f:
-            json.dump(self.tracked_laws, f, ensure_ascii=False, indent=2)
+        """추적 대상 법령 목록 저장 (MongoDB 우선, fallback to file)"""
+        if self.db and self.db.is_connected():
+            self.db.save_all_tracked_laws(self.tracked_laws)
+        else:
+            # Fallback to local file
+            with open(self.tracked_laws_file, 'w', encoding='utf-8') as f:
+                json.dump(self.tracked_laws, f, ensure_ascii=False, indent=2)
+
 
     def _xml_to_dict(self, element) -> Dict:
         """XML 요소를 딕셔너리로 변환"""
@@ -184,7 +208,13 @@ class LawTracker:
             return False
 
     def _save_snapshot(self, law_name: str, law_mst_seq: str, detail: Dict):
-        """법령 스냅샷 저장"""
+        """법령 스냅샷 저장 (MongoDB 우선, fallback to file)"""
+        if self.db and self.db.is_connected():
+            snapshot_id = self.db.save_snapshot(law_name, law_mst_seq, detail)
+            if snapshot_id:
+                return snapshot_id
+        
+        # Fallback to local file
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = self.data_dir / "snapshots" / f"{law_name}_{law_mst_seq}_{timestamp}.json"
 
@@ -199,7 +229,13 @@ class LawTracker:
         return filename
 
     def _get_latest_snapshot(self, law_name: str) -> Optional[Dict]:
-        """가장 최근 스냅샷 로드"""
+        """가장 최근 스냅샷 로드 (MongoDB 우선, fallback to file)"""
+        if self.db and self.db.is_connected():
+            snapshot = self.db.get_latest_snapshot(law_name)
+            if snapshot:
+                return snapshot
+        
+        # Fallback to local file
         snapshots = sorted(list((self.data_dir / "snapshots").glob(f"{law_name}_*.json")), reverse=True)
         if snapshots:
             try:
@@ -303,14 +339,27 @@ class LawTracker:
                             new_content = self._extract_law_content(detail)
                             
                             # HTML 비교 생성
-                            diff_path = self.data_dir / "diffs" / f"{law_name}_{current_pub_date}_diff.html"
+                            diff_filename = f"{law_name}_{current_pub_date}_diff.html"
+                            diff_path = self.data_dir / "diffs" / diff_filename
+                            
+                            # Generate diff HTML
                             self.comparator.generate_side_by_side_comparison(
                                 old_content, 
                                 new_content, 
                                 law_name, 
                                 str(diff_path)
                             )
-                            diff_file = diff_path.name
+                            
+                            # Save to MongoDB if available
+                            if self.db and self.db.is_connected():
+                                try:
+                                    with open(diff_path, 'r', encoding='utf-8') as f:
+                                        diff_content = f.read()
+                                    self.db.save_diff(diff_filename, diff_content)
+                                except Exception as e:
+                                    print(f"   ⚠️ MongoDB diff 저장 실패: {e}")
+                            
+                            diff_file = diff_filename
                             print(f"   📊 신구대조표 생성: {diff_file}")
                         except Exception as e:
                             print(f"   ⚠️ 신구대조표 생성 실패: {e}")
@@ -365,7 +414,11 @@ class LawTracker:
         return updates
 
     def _save_update_history(self, updates: List[Dict]):
-        """변경 이력 저장"""
+        """변경 이력 저장 (MongoDB 우선, fallback to file)"""
+        if self.db and self.db.is_connected():
+            self.db.save_update_history(updates)
+        
+        # Also save to local file as backup
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = self.data_dir / "history" / f"updates_{timestamp}.json"
 

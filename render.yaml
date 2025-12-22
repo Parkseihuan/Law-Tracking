@@ -10,3 +10,5 @@ services:
         value: 3.11.0
       - key: LAW_API_KEY
         sync: false
+      - key: MONGODB_URI
+        sync: false

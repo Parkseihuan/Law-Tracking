@@ -5,6 +5,7 @@
 
 import os
 import json
+import requests
 from flask import Flask, render_template, jsonify, request
 from pathlib import Path
 from datetime import datetime
@@ -13,6 +14,7 @@ from law_hierarchy import LawHierarchy
 from config_manager import ConfigManager
 from notification_service import NotificationService
 from dotenv import load_dotenv
+from apscheduler.schedulers.background import BackgroundScheduler
 
 load_dotenv()
 
@@ -25,6 +27,24 @@ tracker = LawTracker(api_key) if api_key else None
 hierarchy = LawHierarchy()
 config_manager = ConfigManager()
 notification_service = NotificationService(config_manager)
+
+# Keep-alive 스케줄러 초기화
+scheduler = BackgroundScheduler()
+
+def keep_alive_ping():
+    """서버를 깨우기 위한 자체 핑"""
+    try:
+        # Render 환경에서만 실행
+        if os.getenv('RENDER'):
+            service_url = os.getenv('RENDER_EXTERNAL_URL', 'http://localhost:5000')
+            requests.get(f"{service_url}/health", timeout=5)
+            print(f"⏰ Keep-alive ping sent at {datetime.now()}")
+    except Exception as e:
+        print(f"⚠️ Keep-alive ping failed: {e}")
+
+# 10분마다 핑 (Render free tier는 15분 후 sleep)
+scheduler.add_job(func=keep_alive_ping, trigger="interval", minutes=10)
+scheduler.start()
 
 
 # ==================== 페이지 라우트 ====================
@@ -58,6 +78,19 @@ def updates_page():
 def statistics_page():
     """통계 페이지"""
     return render_template('adminlte/statistics.html')
+
+
+@app.route('/health')
+def health_check():
+    """Health check endpoint for monitoring and keep-alive"""
+    status = {
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat(),
+        "mongodb_connected": tracker.db.is_connected() if tracker and tracker.db else False,
+        "tracked_laws_count": len(tracker.tracked_laws) if tracker else 0
+    }
+    return jsonify(status)
+
 
 
 @app.route('/settings')
@@ -266,7 +299,7 @@ def get_law_hierarchy():
 
 @app.route('/api/law-diff')
 def get_law_diff():
-    """신구대조표 HTML 반환"""
+    """신구대조표 HTML 반환 (MongoDB 우선, fallback to file)"""
     filename = request.args.get('filename')
     if not filename:
         return "파일명이 필요합니다", 400
@@ -274,7 +307,14 @@ def get_law_diff():
     # 보안: 파일명에 경로 탐색 문자 포함 여부 확인
     if '..' in filename or '/' in filename or '\\' in filename:
         return "잘못된 파일명입니다", 400
-        
+    
+    # MongoDB에서 먼저 시도
+    if tracker and tracker.db and tracker.db.is_connected():
+        diff_content = tracker.db.get_diff(filename)
+        if diff_content:
+            return diff_content
+    
+    # Fallback to local file
     diff_dir = Path("data/diffs")
     file_path = diff_dir / filename
     
