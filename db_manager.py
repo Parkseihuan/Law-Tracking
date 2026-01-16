@@ -4,6 +4,7 @@ Handles all database operations for tracked laws, snapshots, and diffs
 """
 
 import os
+import certifi
 from datetime import datetime
 from typing import Dict, List, Optional
 from pymongo import MongoClient, ASCENDING, DESCENDING
@@ -35,7 +36,8 @@ class DatabaseManager:
             self.client = MongoClient(
                 self.connection_string,
                 serverSelectionTimeoutMS=5000,
-                connectTimeoutMS=10000
+                connectTimeoutMS=10000,
+                tlsCAFile=certifi.where()
             )
             # Test connection
             self.client.admin.command('ping')
